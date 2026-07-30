@@ -1,65 +1,77 @@
-import Image from "next/image";
+import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
+import { TripCard } from "@/components/trip-card";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="mx-auto w-full max-w-page space-y-section px-page-gutter py-section">
+      <section className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        <PageHeader
+          eyebrow="Your travel workspace"
+          title="Trips"
+          description="Turn scattered travel research into organized trip decisions, with every useful source and planning choice kept in context."
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+        <Link
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-control bg-brand px-5 py-3 text-label font-semibold text-brand-contrast shadow-card transition-colors hover:bg-brand-strong sm:w-fit"
+          href="/trips/new"
+        >
+          New Trip
+        </Link>
+      </section>
+
+      <section className="space-y-5" aria-labelledby="sample-trips-heading">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-label font-semibold uppercase tracking-[0.14em] text-brand">
+              Preview content
+            </p>
+            <h2
+              id="sample-trips-heading"
+              className="mt-2 text-heading font-semibold tracking-[-0.025em] text-ink"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              Sample trip
+            </h2>
+          </div>
+          <p className="max-w-reading text-small text-muted">
+            This fictional trip demonstrates the structure only. Nothing shown
+            here is saved or connected to real travel data.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <ul className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <li>
+            <TripCard
+              name="Barcelona research trip"
+              destination="Barcelona, Spain"
+              planningContext="A flexible city break focused on architecture, local food, and walkable neighborhoods."
+              sourceCount={12}
+              progress="4 options shortlisted; booking decisions are still pending."
+              href="/trips/barcelona"
+              isSample
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </li>
+        </ul>
+      </section>
+
+      <section
+        className="rounded-panel border border-dashed border-border-strong bg-surface px-6 py-8 sm:px-8"
+        aria-labelledby="future-trips-heading"
+      >
+        <div className="max-w-reading space-y-3">
+          <p className="text-label font-semibold text-accent">Getting started</p>
+          <h2
+            id="future-trips-heading"
+            className="text-heading font-semibold tracking-[-0.025em] text-ink"
           >
-            Documentation
-          </a>
+            Your trips will gather here
+          </h2>
+          <p className="text-body text-muted">
+            When trip creation is connected to persistence, this dashboard will
+            collect each planning workspace and show its research progress. For
+            FE-04, the sample above previews that future structure.
+          </p>
         </div>
-      </main>
+      </section>
     </div>
   );
 }
