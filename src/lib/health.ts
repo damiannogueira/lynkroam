@@ -55,11 +55,18 @@ function isHealthResponse(value: unknown): value is HealthResponse {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
+  const headers = new Headers({
+    Accept: "application/json",
+  });
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+
+  if (bypassSecret) {
+    headers.set("x-vercel-protection-bypass", bypassSecret);
+  }
+
   const response = await fetch(`${resolveHealthOrigin()}/api/health`, {
     cache: "no-store",
-    headers: {
-      Accept: "application/json",
-    },
+    headers,
   });
 
   if (!response.ok) {
