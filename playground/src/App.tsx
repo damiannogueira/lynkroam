@@ -1,5 +1,7 @@
+import { useCallback, useRef, useState } from 'react'
 import './App.css'
 import { Disclosure } from './components/hand-built/Disclosure'
+import { ModalDialog } from './components/hand-built/ModalDialog'
 import { Tabs, type TabItem } from './components/hand-built/Tabs'
 
 const accessibilityReviewTabs: TabItem[] = [
@@ -54,6 +56,17 @@ const accessibilityReviewTabs: TabItem[] = [
 ]
 
 function App() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const modalTriggerRef = useRef<HTMLButtonElement | null>(null)
+
+  const openModal = useCallback((): void => {
+    setIsModalOpen(true)
+  }, [])
+
+  const closeModal = useCallback((): void => {
+    setIsModalOpen(false)
+  }, [])
+
   return (
     <div className="page-shell">
       <header className="page-header">
@@ -142,6 +155,80 @@ function App() {
             items={accessibilityReviewTabs}
             defaultActiveId="semantics"
           />
+        </section>
+
+        <section className="review-section" aria-labelledby="modal-title">
+          <div className="section-heading">
+            <p className="section-label">Hand-built component 03</p>
+            <h2 id="modal-title">Modal dialog</h2>
+            <p>
+              The dialog moves focus into a blocking task, contains keyboard
+              focus while open, and restores focus to its opener when closed.
+            </p>
+          </div>
+
+          <aside
+            className="keyboard-note"
+            aria-labelledby="modal-keyboard-title"
+          >
+            <h3 id="modal-keyboard-title">Keyboard review</h3>
+            <p>
+              Open the dialog, then use <kbd>Tab</kbd> and
+              <kbd>Shift + Tab</kbd> to verify focus wraps in both directions.
+              Press <kbd>Escape</kbd> to close it and confirm focus returns to
+              the opener.
+            </p>
+          </aside>
+
+          <div className="modal-demo">
+            <a className="modal-demo__context-link" href="#modal-review-trigger">
+              Focusable element before the modal trigger
+            </a>
+            <button
+              ref={modalTriggerRef}
+              type="button"
+              className="sample-action"
+              id="modal-review-trigger"
+              onClick={openModal}
+            >
+              Open modal dialog
+            </button>
+            <button type="button" className="modal-demo__after-action">
+              Focusable element after the modal trigger
+            </button>
+            <p>
+              After every close method, keyboard focus should return to the
+              “Open modal dialog” button.
+            </p>
+          </div>
+
+          <ModalDialog
+            isOpen={isModalOpen}
+            title="Review modal focus behavior"
+            description="Use this dialog to verify initial focus, containment, closing behavior, and focus restoration."
+            onClose={closeModal}
+            returnFocusRef={modalTriggerRef}
+          >
+            <p>
+              Focus begins on the Close button. Continue through every control
+              to confirm that focus remains inside this dialog.
+            </p>
+            <a href="https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/">
+              Review the WAI-ARIA Modal Dialog Pattern
+            </a>
+            <label className="modal-dialog__check">
+              <input type="checkbox" />
+              I verified the dialog’s forward and backward focus order
+            </label>
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-demo__after-action">
+                Secondary review action
+              </button>
+              <button type="button" className="sample-action" onClick={closeModal}>
+                Finish review
+              </button>
+            </div>
+          </ModalDialog>
         </section>
       </main>
     </div>
