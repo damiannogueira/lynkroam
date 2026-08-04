@@ -1,5 +1,57 @@
 import './App.css'
 import { Disclosure } from './components/hand-built/Disclosure'
+import { Tabs, type TabItem } from './components/hand-built/Tabs'
+
+const accessibilityReviewTabs: TabItem[] = [
+  {
+    id: 'semantics',
+    label: 'Semantics',
+    content: (
+      <div>
+        <h3>Roles create the tab relationship</h3>
+        <p>
+          The tab list, tabs, and active panel expose their purpose and current
+          selection to assistive technology through explicit roles and ARIA
+          relationships.
+        </p>
+        <a href="https://www.w3.org/WAI/ARIA/apg/patterns/tabs/">
+          Review the WAI-ARIA Tabs Pattern
+        </a>
+      </div>
+    ),
+  },
+  {
+    id: 'focus',
+    label: 'Focus movement',
+    content: (
+      <div>
+        <h3>One tab stop enters the tab list</h3>
+        <p>
+          Only the selected tab participates in the page tab order. Arrow keys
+          move focus within the tab list, while Tab continues into the active
+          panel content.
+        </p>
+        <button type="button" className="sample-action">
+          Test focus inside the panel
+        </button>
+      </div>
+    ),
+  },
+  {
+    id: 'activation',
+    label: 'Activation',
+    content: (
+      <div>
+        <h3>Selection follows keyboard focus</h3>
+        <p>
+          These local panels activate immediately when focus moves with an
+          arrow key, Home, or End because displaying their content has no
+          noticeable delay.
+        </p>
+      </div>
+    ),
+  },
+]
 
 function App() {
   return (
@@ -59,6 +111,37 @@ function App() {
               </button>
             </Disclosure>
           </div>
+        </section>
+
+        <section className="review-section" aria-labelledby="tabs-title">
+          <div className="section-heading">
+            <p className="section-label">Hand-built component 02</p>
+            <h2 id="tabs-title">Tabs</h2>
+            <p>
+              The tab list announces a single set of related views, identifies
+              the selected tab, and connects each trigger to its controlled
+              panel.
+            </p>
+          </div>
+
+          <aside
+            className="keyboard-note"
+            aria-labelledby="tabs-keyboard-title"
+          >
+            <h3 id="tabs-keyboard-title">Keyboard review</h3>
+            <p>
+              Press <kbd>Tab</kbd> to enter the tab list. Use
+              <kbd>ArrowLeft</kbd> and <kbd>ArrowRight</kbd> to move and wrap,
+              or <kbd>Home</kbd> and <kbd>End</kbd> to jump to either edge. Press
+              <kbd>Tab</kbd> again to move into focusable panel content.
+            </p>
+          </aside>
+
+          <Tabs
+            label="Accessibility review topics"
+            items={accessibilityReviewTabs}
+            defaultActiveId="semantics"
+          />
         </section>
       </main>
     </div>

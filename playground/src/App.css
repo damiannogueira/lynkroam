@@ -169,6 +169,94 @@ kbd {
   cursor: pointer;
 }
 
+.tabs {
+  min-width: 0;
+}
+
+.tabs__list {
+  display: flex;
+  max-width: 100%;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-strong);
+  scrollbar-width: thin;
+}
+
+.tabs__trigger {
+  position: relative;
+  display: flex;
+  min-width: max-content;
+  min-height: 3.75rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.7rem 1rem 0.6rem;
+  border: 0;
+  border-bottom: 0.3rem solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabs__trigger:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.tabs__trigger[aria-selected='true'] {
+  border-bottom-color: var(--accent-strong);
+  color: var(--text);
+}
+
+.tabs__selected-marker {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tabs__panel {
+  min-height: 13rem;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 0.85rem 0.85rem;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.tabs__panel h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.tabs__panel p {
+  margin: 0.85rem 0 1.25rem;
+}
+
+.tabs__panel a {
+  color: var(--link);
+  font-weight: 700;
+  text-underline-offset: 0.2em;
+}
+
+.tabs--empty {
+  padding: 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.75rem;
+  color: var(--text-muted);
+}
+
+.tabs--empty p {
+  margin: 0;
+}
+
 @media (min-width: 64rem) {
   .review-section {
     display: grid;
@@ -186,6 +274,11 @@ kbd {
     grid-column: 2;
     grid-row: 1 / span 2;
     margin-top: 0;
+  }
+
+  .review-section > .tabs {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 
