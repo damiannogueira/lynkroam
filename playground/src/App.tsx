@@ -3,6 +3,8 @@ import './App.css'
 import { Disclosure } from './components/hand-built/Disclosure'
 import { ModalDialog } from './components/hand-built/ModalDialog'
 import { Tabs, type TabItem } from './components/hand-built/Tabs'
+import { ShadcnDialogDemo } from './components/shadcn-demo/ShadcnDialogDemo'
+import { ShadcnTabsDemo } from './components/shadcn-demo/ShadcnTabsDemo'
 
 const accessibilityReviewTabs: TabItem[] = [
   {
@@ -229,6 +231,27 @@ function App() {
               </button>
             </div>
           </ModalDialog>
+        </section>
+
+        <section
+          className="comparison-area"
+          aria-labelledby="shadcn-comparison-title"
+        >
+          <div className="comparison-intro">
+            <p className="section-label">Library comparison</p>
+            <h2 id="shadcn-comparison-title">shadcn/ui comparison</h2>
+            <p>
+              These examples compose generated shadcn wrappers backed by Radix,
+              so their accessibility behavior is delegated to the library
+              primitives. The hand-built examples above remain the original
+              exercise implementations.
+            </p>
+          </div>
+
+          <div className="comparison-grid">
+            <ShadcnDialogDemo />
+            <ShadcnTabsDemo />
+          </div>
         </section>
       </main>
     </div>
