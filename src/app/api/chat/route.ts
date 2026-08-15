@@ -29,22 +29,54 @@ function isChatRequestBody(value: unknown): value is ChatRequestBody {
   );
 }
 
-function isTextConversation(messages: UIMessage[]) {
-  return (
-    messages.length > 0 &&
-    messages.every((message) => {
-      if (message.role !== "user" && message.role !== "assistant") {
-        return false;
+function normalizeConversation(messages: UIMessage[]): UIMessage[] | null {
+  if (messages.length === 0) {
+    return null;
+  }
+
+  const normalizedMessages: UIMessage[] = [];
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      const containsOnlyText = message.parts.every(
+        (part) => part.type === "text",
+      );
+      const containsVisibleText = message.parts.some(
+        (part) => part.type === "text" && part.text.trim().length > 0,
+      );
+
+      if (!containsOnlyText || !containsVisibleText) {
+        return null;
       }
 
-      return (
-        message.parts.every((part) => part.type === "text") &&
-        message.parts.some(
-          (part) => part.type === "text" && part.text.trim().length > 0,
-        )
+      normalizedMessages.push(message);
+      continue;
+    }
+
+    if (message.role === "assistant") {
+      const containsOnlySupportedParts = message.parts.every(
+        (part) => part.type === "text" || part.type === "step-start",
       );
-    })
-  );
+
+      if (!containsOnlySupportedParts) {
+        return null;
+      }
+
+      const containsVisibleText = message.parts.some(
+        (part) => part.type === "text" && part.text.trim().length > 0,
+      );
+
+      if (containsVisibleText) {
+        normalizedMessages.push(message);
+      }
+
+      continue;
+    }
+
+    return null;
+  }
+
+  return normalizedMessages.length > 0 ? normalizedMessages : null;
 }
 
 function invalidRequestResponse() {
@@ -67,12 +99,18 @@ export async function POST(request: Request) {
   // Validate untrusted UI messages before they reach model-message conversion.
   const validation = await safeValidateUIMessages({ messages: body.messages });
 
-  if (!validation.success || !isTextConversation(validation.data)) {
+  if (!validation.success) {
+    return invalidRequestResponse();
+  }
+
+  const normalizedMessages = normalizeConversation(validation.data);
+
+  if (normalizedMessages === null) {
     return invalidRequestResponse();
   }
 
   try {
-    const modelMessages = await convertToModelMessages(validation.data);
+    const modelMessages = await convertToModelMessages(normalizedMessages);
 
     // Forward the request signal so the future client Stop action aborts generation.
     const result = streamText({
