@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 
@@ -104,6 +110,19 @@ export function ResearchAssistantChat() {
 
     setInput("");
     void sendMessage({ text });
+  }
+
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
   }
 
   return (
@@ -234,6 +253,7 @@ export function ResearchAssistantChat() {
           placeholder="Ask about your travel research..."
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleComposerKeyDown}
           disabled={isBusy}
         />
 
