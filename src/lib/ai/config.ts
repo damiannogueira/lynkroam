@@ -3,13 +3,13 @@ import "server-only";
 import { google, type GoogleLanguageModelOptions } from "@ai-sdk/google";
 
 // Keep provider configuration out of the client module graph and protect future credentials.
-export const GEMINI_MODEL_ID = "gemini-2.5-flash";
+export const GEMINI_MODEL_ID = "gemini-3.6-flash";
 export const RESEARCH_ASSISTANT_MAX_OUTPUT_TOKENS = 800;
 
 // Keep streamed text quick and predictable; the UI will own its separate waiting state.
 export const RESEARCH_ASSISTANT_PROVIDER_OPTIONS = {
   thinkingConfig: {
-    thinkingBudget: 0,
+    thinkingLevel: "minimal",
   },
 } satisfies GoogleLanguageModelOptions;
 
