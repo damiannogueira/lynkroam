@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       messages: modelMessages,
       maxOutputTokens: RESEARCH_ASSISTANT_MAX_OUTPUT_TOKENS,
       providerOptions: {
-        anthropic: RESEARCH_ASSISTANT_PROVIDER_OPTIONS,
+        google: RESEARCH_ASSISTANT_PROVIDER_OPTIONS,
       },
       abortSignal: request.signal,
     });
