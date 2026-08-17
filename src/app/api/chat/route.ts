@@ -2,8 +2,8 @@ import {
   consumeStream,
   convertToModelMessages,
   safeValidateUIMessages,
+  stepCountIs,
   streamText,
-  type UIMessage,
 } from "ai";
 import {
   RESEARCH_ASSISTANT_MAX_OUTPUT_TOKENS,
@@ -11,6 +11,8 @@ import {
   RESEARCH_ASSISTANT_SYSTEM_PROMPT,
   researchAssistantModel,
 } from "@/lib/ai/config";
+import { researchAssistantTools } from "@/lib/ai/tools";
+import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
 const INVALID_REQUEST_MESSAGE = "Invalid chat request.";
 const STREAM_ERROR_MESSAGE =
@@ -29,12 +31,14 @@ function isChatRequestBody(value: unknown): value is ChatRequestBody {
   );
 }
 
-function normalizeConversation(messages: UIMessage[]): UIMessage[] | null {
+function normalizeConversation(
+  messages: ResearchAssistantUIMessage[],
+): ResearchAssistantUIMessage[] | null {
   if (messages.length === 0) {
     return null;
   }
 
-  const normalizedMessages: UIMessage[] = [];
+  const normalizedMessages: ResearchAssistantUIMessage[] = [];
 
   for (const message of messages) {
     if (message.role === "user") {
@@ -55,7 +59,10 @@ function normalizeConversation(messages: UIMessage[]): UIMessage[] | null {
 
     if (message.role === "assistant") {
       const containsOnlySupportedParts = message.parts.every(
-        (part) => part.type === "text" || part.type === "step-start",
+        (part) =>
+          part.type === "text" ||
+          part.type === "step-start" ||
+          part.type === "tool-fetchUrlMetadata",
       );
 
       if (!containsOnlySupportedParts) {
@@ -65,8 +72,11 @@ function normalizeConversation(messages: UIMessage[]): UIMessage[] | null {
       const containsVisibleText = message.parts.some(
         (part) => part.type === "text" && part.text.trim().length > 0,
       );
+      const containsMetadataTool = message.parts.some(
+        (part) => part.type === "tool-fetchUrlMetadata",
+      );
 
-      if (containsVisibleText) {
+      if (containsVisibleText || containsMetadataTool) {
         normalizedMessages.push(message);
       }
 
@@ -97,7 +107,10 @@ export async function POST(request: Request) {
   }
 
   // Validate untrusted UI messages before they reach model-message conversion.
-  const validation = await safeValidateUIMessages({ messages: body.messages });
+  const validation = await safeValidateUIMessages<ResearchAssistantUIMessage>({
+    messages: body.messages,
+    tools: researchAssistantTools,
+  });
 
   if (!validation.success) {
     return invalidRequestResponse();
@@ -110,7 +123,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const modelMessages = await convertToModelMessages(normalizedMessages);
+    const modelMessages = await convertToModelMessages(normalizedMessages, {
+      tools: researchAssistantTools,
+    });
 
     // Forward the request signal so the future client Stop action aborts generation.
     const result = streamText({
@@ -121,6 +136,8 @@ export async function POST(request: Request) {
       providerOptions: {
         google: RESEARCH_ASSISTANT_PROVIDER_OPTIONS,
       },
+      tools: researchAssistantTools,
+      stopWhen: stepCountIs(2),
       abortSignal: request.signal,
     });
 
