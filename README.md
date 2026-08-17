@@ -4,19 +4,23 @@ Lynkroam is a visual travel research workspace that helps travelers turn scatter
 
 The product focuses on the research-to-decision stage of travel planning. It is designed to preserve source context and help travelers compare and organize options, rather than act as a generic bookmark manager or automatically generate an itinerary.
 
-## Current FE-04 scope
+## Current application scope
 
-This repository currently contains a deployed application skeleton with:
+This repository contains Lynkroam's deployed application foundation with:
 
-- Routed placeholder screens for the approved product surfaces
+- Routed trip-planning screens and placeholder product surfaces
 - A shared root layout and global and trip-level navigation
 - A responsive design system
 - Server Components by default
 - Fictional Barcelona sample data
 - A server-rendered health check
+- A trip-scoped Research Assistant with streamed AI chat
+- Google Gemini integration through AI SDK
+- A typed `fetchUrlMetadata` server-side tool
+- Structured progress, success, and error states for metadata inspection
 - Vercel production and Preview Deployments
 
-All displayed trip content is fictional and non-persistent. The current forms and planning surfaces demonstrate structure and visual direction only.
+Displayed trip content remains fictional and non-persistent. The current forms and planning surfaces demonstrate structure and visual direction only; chat conversation state is not persisted.
 
 ## Implemented routes
 
@@ -27,6 +31,8 @@ All displayed trip content is fictional and non-persistent. The current forms an
 | `/trips/[tripId]` | Visual research workspace |
 | `/trips/[tripId]/links` | Structured links and sources |
 | `/trips/[tripId]/itinerary` | Curated itinerary view |
+| `/trips/[tripId]/assistant` | Streaming travel research assistant and source metadata inspection |
+| `/api/chat` | Streaming AI chat and typed tool endpoint |
 | `/health` | Visual application health status |
 | `/api/health` | JSON health endpoint |
 
@@ -35,6 +41,7 @@ The fictional Barcelona workspace can be reviewed manually at:
 - `/trips/barcelona`
 - `/trips/barcelona/links`
 - `/trips/barcelona/itinerary`
+- `/trips/barcelona/assistant`
 
 ## Technology
 
@@ -43,12 +50,14 @@ The fictional Barcelona workspace can be reviewed manually at:
 - TypeScript
 - Tailwind CSS 4
 - ESLint 9
+- AI SDK 7 with the Google provider and Gemini
+- Zod 4
 - npm
 - Vercel
 
 ## Server Component policy
 
-Pages and components are Server Components by default. No Client Component is currently required. The `"use client"` directive should be introduced only when a feature requires genuine browser-side interactivity.
+Pages and components remain Server Components by default. Client Components are introduced only when genuine browser-side interactivity requires them. The Research Assistant chat is a Client Component because it owns `useChat`, input state, streaming interaction, stopping, and conversation scrolling.
 
 The root layout owns the shared `<main>` landmark, so individual pages render their content without adding another main landmark.
 
@@ -78,11 +87,46 @@ npm run start
 Real `.env*` files remain ignored. The committed `.env.example` documents the optional environment structure without containing secrets.
 
 - `HEALTHCHECK_ORIGIN` optionally overrides the application origin outside Vercel.
+- `GOOGLE_GENERATIVE_AI_API_KEY` provides the server-side credential used by the Research Assistant's Gemini integration.
 - Without an override or Vercel URL, the health utility falls back to `http://localhost:${PORT ?? 3000}`.
 - Vercel supplies `VERCEL_URL` and `VERCEL_ENV`.
 - No secret values belong in the repository.
 
 Protected Vercel Preview Deployments use the server-only system variable `VERCEL_AUTOMATION_BYPASS_SECRET`. Its sole purpose here is to authorize the internal health request through deployment protection.
+
+## Research Assistant tool contract
+
+### `fetchUrlMetadata`
+
+`fetchUrlMetadata` inspects page-level metadata from a user-supplied public HTTP or HTTPS webpage. It is an on-demand metadata tool, not unrestricted web browsing or verification of every fact on a page.
+
+Input:
+
+```ts
+{
+  url: string;
+}
+```
+
+`url` must be a complete public HTTP or HTTPS webpage URL.
+
+Structured return value:
+
+```ts
+{
+  url: string;
+  hostname: string;
+  title: string | null;
+  description: string | null;
+  siteName: string | null;
+}
+```
+
+The final URL and hostname are always returned on success. Optional page metadata is `null` when unavailable rather than inferred.
+
+The tool can fail for invalid or unsupported URLs, blocked local or private-network destinations, HTTP errors, non-HTML responses, timeouts, oversized responses, or excessive redirects. A failed execution appears as a designed error state inside the conversation instead of crashing the chat.
+
+Its typed UI part renders four lifecycle states: `input-streaming`, `input-available`, `output-available`, and `output-error`. Successful structured output is presented as a source metadata card rather than raw JSON.
 
 ## Health check
 
@@ -92,7 +136,7 @@ Both the API response and server fetch disable caching. The endpoint exposes no 
 
 ## Deployment workflow
 
-`main` is the Vercel Production Branch. Pushes to `fe-04/capstone-skeleton` generate Preview Deployments for review.
+`main` is the Vercel Production Branch. Feature and assignment branches can be reviewed through Vercel Preview Deployments before merging.
 
 Production is available at [https://lynkroam.vercel.app](https://lynkroam.vercel.app).
 
@@ -100,7 +144,7 @@ Changes should pass local verification and be reviewed in a Preview Deployment b
 
 ## Accessibility and responsive targets
 
-The FE-04 foundation includes:
+The application foundation includes:
 
 - Semantic landmarks and a clear heading hierarchy
 - Keyboard-accessible navigation
@@ -113,12 +157,13 @@ The intended responsive review widths are 375px and 1280px.
 
 ## Explicit current non-goals
 
-FE-04 does not implement:
+The current application does not implement:
 
 - Authentication
 - Persistence or database workflows
 - Real trip creation
-- URL ingestion or metadata extraction
+- Persistent URL-ingestion or automatic source-library workflows
+- Full-page extraction or verification of changing webpage facts
 - Drag-and-drop
 - Filtering and sorting
 - Maps
@@ -129,9 +174,9 @@ FE-04 does not implement:
 
 ## Future direction
 
-The following ideas are outside FE-04 and are not currently implemented. Lynkroam may later support:
+The following ideas are not currently implemented. Lynkroam may later support:
 
-- Pasting travel links and extracting useful source metadata
+- Persisting inspected travel sources into an automatic ingestion workflow
 - Organizing large trips hierarchically by continent, country, and city
 - Automatic location classification with manual correction
 - Views by location, category, decision state, and itinerary chronology
@@ -148,4 +193,4 @@ npm run lint
 npm run build
 ```
 
-The production build must expose every required FE-04 route. Repository review must also confirm that no secrets or generated artifacts are tracked.
+The production build must expose the application's implemented routes, including the Research Assistant and health endpoints. Repository review must also confirm that no secrets or generated artifacts are tracked.

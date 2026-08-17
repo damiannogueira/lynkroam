@@ -13,8 +13,9 @@ export default async function TripAssistantPage({
         </h2>
         <p className="text-body text-muted">
           Use the research you have gathered to compare options, uncover
-          missing information, and reason through travel decisions. Responses
-          are based on the context shared in this conversation.
+          missing information, and reason through travel decisions. When you
+          ask, it can inspect page-level metadata from a public webpage, but it
+          does not verify changing details such as prices or availability.
         </p>
       </section>
 
