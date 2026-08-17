@@ -8,7 +8,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useChat } from "@ai-sdk/react";
-import type { UIMessage } from "ai";
+import { FetchUrlMetadataTool } from "@/components/fetch-url-metadata-tool";
+import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
 const NEAR_BOTTOM_THRESHOLD = 48;
 const GENERIC_ERROR_MESSAGE =
@@ -21,7 +22,9 @@ function isNearBottom(container: HTMLDivElement) {
   );
 }
 
-function newestAssistantHasText(messages: UIMessage[]) {
+function newestAssistantHasVisibleContent(
+  messages: ResearchAssistantUIMessage[],
+) {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
 
@@ -31,7 +34,9 @@ function newestAssistantHasText(messages: UIMessage[]) {
 
     if (message.role === "assistant") {
       return message.parts.some(
-        (part) => part.type === "text" && part.text.trim().length > 0,
+        (part) =>
+          (part.type === "text" && part.text.trim().length > 0) ||
+          part.type === "tool-fetchUrlMetadata",
       );
     }
   }
@@ -45,11 +50,13 @@ export function ResearchAssistantChat() {
   const conversationRef = useRef<HTMLDivElement>(null);
   const isFollowingLatestRef = useRef(true);
   const previousScrollTopRef = useRef(0);
-  const { messages, sendMessage, status, stop, error, clearError } = useChat();
+  const { messages, sendMessage, status, stop, error, clearError } =
+    useChat<ResearchAssistantUIMessage>();
   const isBusy = status === "submitted" || status === "streaming";
   const isWaitingForText =
     status === "submitted" ||
-    (status === "streaming" && !newestAssistantHasText(messages));
+    (status === "streaming" &&
+      !newestAssistantHasVisibleContent(messages));
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -153,11 +160,14 @@ export function ResearchAssistantChat() {
                   return null;
                 }
 
-                const textParts = message.parts.filter(
-                  (part) => part.type === "text",
+                const renderableParts = message.parts.filter(
+                  (part) =>
+                    part.type === "text" ||
+                    (message.role === "assistant" &&
+                      part.type === "tool-fetchUrlMetadata"),
                 );
 
-                if (textParts.length === 0) {
+                if (renderableParts.length === 0) {
                   return null;
                 }
 
@@ -185,14 +195,29 @@ export function ResearchAssistantChat() {
                         {isUser ? "You" : "Research Assistant"}
                       </p>
                       <div className="mt-2 space-y-3 text-body">
-                        {textParts.map((part, index) => (
-                          <p
-                            className="whitespace-pre-wrap break-words"
-                            key={`${message.id}-text-${index}`}
-                          >
-                            {part.text}
-                          </p>
-                        ))}
+                        {renderableParts.map((part, index) => {
+                          if (part.type === "text") {
+                            return (
+                              <p
+                                className="whitespace-pre-wrap break-words"
+                                key={`${message.id}-text-${index}`}
+                              >
+                                {part.text}
+                              </p>
+                            );
+                          }
+
+                          if (part.type === "tool-fetchUrlMetadata") {
+                            return (
+                              <FetchUrlMetadataTool
+                                key={part.toolCallId}
+                                part={part}
+                              />
+                            );
+                          }
+
+                          return null;
+                        })}
                       </div>
                     </article>
                   </li>
@@ -259,7 +284,8 @@ export function ResearchAssistantChat() {
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-muted">
-            Responses use only the context shared in this conversation.
+            Ask the assistant to inspect page-level metadata when checking a
+            webpage source.
           </p>
           {isBusy ? (
             <button
