@@ -13,7 +13,12 @@ import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
 const NEAR_BOTTOM_THRESHOLD = 48;
 const GENERIC_ERROR_MESSAGE =
-  "The Research Assistant couldn't complete that response. You can try another message.";
+  "The Research Assistant couldn't complete that response.";
+const EXAMPLE_PROMPTS = [
+  "Help me compare two travel priorities for this trip.",
+  "What important research might I still be missing?",
+  "Inspect this webpage source: https://example.com",
+];
 
 function isNearBottom(container: HTMLDivElement) {
   return (
@@ -48,10 +53,19 @@ export function ResearchAssistantChat() {
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const isFollowingLatestRef = useRef(true);
   const previousScrollTopRef = useRef(0);
-  const { messages, sendMessage, status, stop, error, clearError } =
-    useChat<ResearchAssistantUIMessage>();
+  const retryInFlightRef = useRef(false);
+  const {
+    messages,
+    sendMessage,
+    regenerate,
+    status,
+    stop,
+    error,
+    clearError,
+  } = useChat<ResearchAssistantUIMessage>();
   const isBusy = status === "submitted" || status === "streaming";
   const isWaitingForText =
     status === "submitted" ||
@@ -119,6 +133,24 @@ export function ResearchAssistantChat() {
     void sendMessage({ text });
   }
 
+  function handleExamplePrompt(prompt: string) {
+    setInput(prompt);
+    composerRef.current?.focus();
+  }
+
+  function handleRetry() {
+    if (retryInFlightRef.current || isBusy) {
+      return;
+    }
+
+    retryInFlightRef.current = true;
+    void regenerate()
+      .catch(() => undefined)
+      .finally(() => {
+        retryInFlightRef.current = false;
+      });
+  }
+
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
       event.key !== "Enter" ||
@@ -152,6 +184,18 @@ export function ResearchAssistantChat() {
                 Ask the Research Assistant to compare your travel research,
                 identify missing information, or reason through trade-offs.
               </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                {EXAMPLE_PROMPTS.map((prompt) => (
+                  <button
+                    className="min-h-11 rounded-control border border-border-strong bg-surface-elevated px-3 py-2 text-left text-small font-semibold text-brand transition-colors hover:border-brand hover:bg-brand-soft"
+                    key={prompt}
+                    type="button"
+                    onClick={() => handleExamplePrompt(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <ol className="space-y-5">
@@ -227,17 +271,23 @@ export function ResearchAssistantChat() {
           )}
 
           {isWaitingForText ? (
-            <p
-              className="flex items-center gap-3 text-label font-semibold text-muted"
+            <div
+              className="max-w-reading rounded-card border border-border bg-surface p-4 text-ink sm:p-5"
               role="status"
               aria-live="polite"
             >
-              <span
-                className="h-2.5 w-2.5 rounded-pill bg-brand"
-                aria-hidden="true"
-              />
-              Research Assistant is thinking...
-            </p>
+              <p className="text-small font-semibold uppercase tracking-[0.12em] text-brand">
+                Research Assistant
+              </p>
+              <p className="mt-2 text-label font-semibold text-muted">
+                Research Assistant is thinking...
+              </p>
+              <div className="mt-4 space-y-3" aria-hidden="true">
+                <span className="block h-3 w-full animate-pulse rounded-pill bg-brand-soft" />
+                <span className="block h-3 w-5/6 animate-pulse rounded-pill bg-brand-soft" />
+                <span className="block h-3 w-2/3 animate-pulse rounded-pill bg-brand-soft" />
+              </div>
+            </div>
           ) : null}
 
           {error ? (
@@ -245,7 +295,19 @@ export function ResearchAssistantChat() {
               className="rounded-card border border-warning/40 bg-warning/10 p-4 text-body text-ink"
               role="alert"
             >
-              {GENERIC_ERROR_MESSAGE}
+              <p className="font-semibold">Response interrupted</p>
+              <p className="mt-2 text-small text-muted">
+                {GENERIC_ERROR_MESSAGE} Retry only the failed assistant
+                response, or write a new message below.
+              </p>
+              <button
+                className="mt-4 inline-flex min-h-11 items-center justify-center rounded-control border border-warning bg-surface px-4 py-2 text-label font-semibold text-ink transition-colors hover:bg-warning/10 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                onClick={handleRetry}
+                disabled={isBusy}
+              >
+                Retry response
+              </button>
             </div>
           ) : null}
         </div>
@@ -275,6 +337,7 @@ export function ResearchAssistantChat() {
           className="mt-2 min-h-28 w-full resize-y rounded-control border border-border-strong bg-surface-elevated px-4 py-3 text-body text-ink outline-none placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25 disabled:cursor-not-allowed disabled:bg-canvas disabled:text-muted"
           id="research-assistant-message"
           name="message"
+          ref={composerRef}
           placeholder="Ask about your travel research..."
           value={input}
           onChange={(event) => setInput(event.target.value)}

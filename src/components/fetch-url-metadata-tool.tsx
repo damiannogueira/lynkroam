@@ -87,6 +87,51 @@ export function FetchUrlMetadataTool({ part }: FetchUrlMetadataToolProps) {
 
   if (part.state === "output-available") {
     const { description, hostname, siteName, title, url } = part.output;
+    const hasNoDescriptiveMetadata =
+      title === null && description === null && siteName === null;
+
+    if (hasNoDescriptiveMetadata) {
+      return (
+        <div
+          className="rounded-card border border-dashed border-accent/60 bg-surface-elevated p-4 text-ink shadow-elevated transition-colors duration-200 sm:p-5"
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-accent text-small font-semibold text-accent"
+              aria-hidden="true"
+            >
+              i
+            </span>
+            <div className="min-w-0">
+              <p className="text-small font-semibold uppercase tracking-[0.12em] text-accent">
+                No descriptive metadata found
+              </p>
+              <p className="mt-1 break-words text-small text-muted">
+                The page was reached successfully, but it did not expose a
+                useful title, description, or site name.
+              </p>
+              <p className="mt-2 break-words text-small font-semibold text-ink">
+                {hostname}
+              </p>
+            </div>
+          </div>
+
+          <a
+            className="mt-4 inline-flex min-h-11 max-w-full items-center rounded-control border border-border-strong px-3 py-2 text-label font-semibold text-brand transition-colors hover:border-brand hover:bg-brand-soft"
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <span className="truncate">Open source</span>
+            <span className="ml-2 shrink-0" aria-hidden="true">
+              ↗
+            </span>
+          </a>
+          <p className="mt-2 break-all text-small text-muted">{url}</p>
+        </div>
+      );
+    }
 
     return (
       <div
