@@ -96,6 +96,8 @@ Protected Vercel Preview Deployments use the server-only system variable `VERCEL
 
 ## Research Assistant tool contract
 
+The Research Assistant includes actionable click-to-fill prompts for first-run guidance and a response-shaped pending state before visible content arrives. If a chat response is interrupted, partial streamed content remains visible and `Retry response` retries the failed assistant response without resending the user's message. A route-scoped recovery boundary handles unexpected display failures, while metadata results distinguish normal success, successful results with no descriptive content, and tool execution failures.
+
 ### `fetchUrlMetadata`
 
 `fetchUrlMetadata` inspects page-level metadata from a user-supplied public HTTP or HTTPS webpage. It is an on-demand metadata tool, not unrestricted web browsing or verification of every fact on a page.
