@@ -157,6 +157,10 @@ The application foundation includes:
 
 The intended responsive review widths are 375px and 1280px.
 
+## Motion and state micro-interactions
+
+The live `/motion` demo uses approximately 150ms ease-out hover/focus feedback, a 100ms ease-out active press, and 200ms ease-out lifecycle-content and state color/shadow transitions. Its deterministic action delay is 900ms; success remains visible for 1200ms, while error remains for 1500ms because recovery feedback benefits from slightly more reading time. Fast direct-input feedback feels immediate, while the slightly slower lifecycle changes remain perceptible without feeling sluggish; transform and opacity provide the primary motion without animating width, height, or other layout properties, and `prefers-reduced-motion` removes movement while preserving loading, success, error, and focus feedback.
+
 ## Explicit current non-goals
 
 The current application does not implement:
