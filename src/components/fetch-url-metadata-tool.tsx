@@ -149,9 +149,9 @@ export function FetchUrlMetadataTool({ part }: FetchUrlMetadataToolProps) {
             <p className="text-small font-semibold uppercase tracking-[0.12em] text-positive">
               Source metadata ready
             </p>
-            <h4 className="mt-1 break-words text-body font-semibold text-ink">
+            <h3 className="mt-1 break-words text-body font-semibold text-ink">
               {title ?? "Title unavailable"}
-            </h4>
+            </h3>
             <p className="mt-1 break-words text-small text-muted">
               {siteName ? `${siteName} · ${hostname}` : hostname}
             </p>
