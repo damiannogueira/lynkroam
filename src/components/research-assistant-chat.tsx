@@ -352,7 +352,7 @@ export function ResearchAssistantChat() {
           </p>
           {isBusy ? (
             <button
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-strong bg-surface px-5 py-3 text-label font-semibold text-ink transition-colors hover:border-accent hover:text-accent sm:w-auto"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-strong bg-surface px-5 py-3 text-label font-semibold text-ink transition-colors hover:border-accent hover:text-accent-strong sm:w-auto"
               type="button"
               onClick={() => void stop()}
             >

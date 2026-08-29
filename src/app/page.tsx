@@ -58,7 +58,9 @@ export default function Home() {
         aria-labelledby="future-trips-heading"
       >
         <div className="max-w-reading space-y-3">
-          <p className="text-label font-semibold text-accent">Getting started</p>
+          <p className="text-label font-semibold text-accent-strong">
+            Getting started
+          </p>
           <h2
             id="future-trips-heading"
             className="text-heading font-semibold tracking-[-0.025em] text-ink"
