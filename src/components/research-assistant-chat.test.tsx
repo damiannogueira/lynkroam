@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,15 @@ describe("ResearchAssistantChat response states", () => {
 
     render(<ResearchAssistantChat />);
 
-    const pendingStatus = screen.getByRole("status");
+    const pendingStatus = screen
+      .getAllByRole("status")
+      .find((status) =>
+        within(status).queryByText("Research Assistant is thinking..."),
+      );
+    expect(pendingStatus).toBeDefined();
+    if (!pendingStatus) {
+      throw new Error("Pending status was not rendered.");
+    }
     expect(
       within(pendingStatus).getByText("Research Assistant is thinking..."),
     ).toBeInTheDocument();
@@ -96,7 +104,15 @@ describe("ResearchAssistantChat response states", () => {
 
     render(<ResearchAssistantChat />);
 
-    const pendingStatus = screen.getByRole("status");
+    const pendingStatus = screen
+      .getAllByRole("status")
+      .find((status) =>
+        within(status).queryByText("Research Assistant is thinking..."),
+      );
+    expect(pendingStatus).toBeDefined();
+    if (!pendingStatus) {
+      throw new Error("Pending status was not rendered.");
+    }
     expect(
       within(pendingStatus).getByText("Research Assistant is thinking..."),
     ).toBeInTheDocument();
@@ -126,12 +142,180 @@ describe("ResearchAssistantChat response states", () => {
     render(<ResearchAssistantChat />);
 
     expect(
-      screen.getByText("A deterministic streaming response."),
+      within(screen.getByRole("article")).getByText(
+        "A deterministic streaming response.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("Research Assistant is thinking..."),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+
+  it("announces completed streamed sentences and flushes the remaining text", async () => {
+    const user = userEvent.setup();
+    const streamingMessage = (text: string, state: "streaming" | "done") =>
+      ({
+        id: "assistant-announcement",
+        role: "assistant",
+        parts: [{ type: "text", text, state }],
+      }) satisfies ResearchAssistantUIMessage;
+
+    setChatState({
+      messages: [streamingMessage("An incomplete response", "streaming")],
+      status: "streaming",
+      error: undefined,
+    });
+
+    const { rerender } = render(<ResearchAssistantChat />);
+    const responseUpdates = screen.getByRole("status", {
+      name: "Research Assistant response updates",
+    });
+
+    expect(responseUpdates).toBeEmptyDOMElement();
+    expect(screen.getByText("An incomplete response")).toBeInTheDocument();
+
+    const stopButton = screen.getByRole("button", { name: "Stop" });
+    await user.click(stopButton);
+    expect(chatMocks.stop).toHaveBeenCalledTimes(1);
+
+    setChatState({
+      messages: [streamingMessage("An incomplete response is now complete.", "streaming")],
+      status: "streaming",
+      error: undefined,
+    });
+    rerender(<ResearchAssistantChat />);
+
+    await waitFor(() =>
+      expect(responseUpdates).toHaveTextContent(
+        "An incomplete response is now complete.",
+      ),
+    );
+
+    setChatState({
+      messages: [
+        streamingMessage(
+          "An incomplete response is now complete. A second sentence! trailing words",
+          "streaming",
+        ),
+      ],
+      status: "streaming",
+      error: undefined,
+    });
+    rerender(<ResearchAssistantChat />);
+
+    await waitFor(() =>
+      expect(responseUpdates).toHaveTextContent("A second sentence!"),
+    );
+    expect(responseUpdates).not.toHaveTextContent(
+      "An incomplete response is now complete.",
+    );
+
+    setChatState({
+      messages: [
+        streamingMessage(
+          "An incomplete response is now complete. A second sentence! trailing words",
+          "done",
+        ),
+      ],
+      status: "ready",
+      error: undefined,
+    });
+    rerender(<ResearchAssistantChat />);
+
+    await waitFor(() =>
+      expect(responseUpdates).toHaveTextContent("trailing words"),
+    );
+    expect(responseUpdates).not.toHaveTextContent("A second sentence!");
+    expect(
+      screen.getByText(
+        "An incomplete response is now complete. A second sentence! trailing words",
+      ),
+    ).toBeInTheDocument();
+
+    rerender(<ResearchAssistantChat />);
+    expect(responseUpdates).toHaveTextContent("trailing words");
+  });
+
+  it("replaces the live-region node for identical consecutive announcements", async () => {
+    const streamingMessage = (text: string) =>
+      ({
+        id: "assistant-repeated-announcement",
+        role: "assistant",
+        parts: [{ type: "text", text, state: "streaming" }],
+      }) satisfies ResearchAssistantUIMessage;
+
+    setChatState({
+      messages: [streamingMessage("Yes.")],
+      status: "streaming",
+      error: undefined,
+    });
+
+    const { rerender } = render(<ResearchAssistantChat />);
+    const responseUpdates = screen.getByRole("status", {
+      name: "Research Assistant response updates",
+    });
+
+    await waitFor(() => expect(responseUpdates).toHaveTextContent("Yes."));
+    const firstAnnouncement = responseUpdates.firstElementChild;
+    expect(firstAnnouncement).not.toBeNull();
+
+    setChatState({
+      messages: [streamingMessage("Yes. Yes.")],
+      status: "streaming",
+      error: undefined,
+    });
+    rerender(<ResearchAssistantChat />);
+
+    await waitFor(() =>
+      expect(responseUpdates.firstElementChild).not.toBe(firstAnnouncement),
+    );
+    expect(responseUpdates).toHaveTextContent("Yes.");
+    expect(screen.getByText("Yes. Yes.")).toBeInTheDocument();
+  });
+
+  it("flushes an unpunctuated streaming remainder when the response errors", async () => {
+    const partialAssistantMessage = {
+      id: "assistant-error-announcement",
+      role: "assistant",
+      parts: [
+        {
+          type: "text",
+          text: "A partial response",
+          state: "streaming",
+        },
+      ],
+    } satisfies ResearchAssistantUIMessage;
+
+    setChatState({
+      messages: [partialAssistantMessage],
+      status: "streaming",
+      error: undefined,
+    });
+
+    const { rerender } = render(<ResearchAssistantChat />);
+    const responseUpdates = screen.getByRole("status", {
+      name: "Research Assistant response updates",
+    });
+    expect(responseUpdates).toBeEmptyDOMElement();
+
+    setChatState({
+      messages: [partialAssistantMessage],
+      status: "error",
+      error: new Error("Provider stream failed"),
+    });
+    rerender(<ResearchAssistantChat />);
+
+    await waitFor(() =>
+      expect(responseUpdates).toHaveTextContent("A partial response"),
+    );
+    const flushedAnnouncement = responseUpdates.firstElementChild;
+
+    rerender(<ResearchAssistantChat />);
+    expect(responseUpdates.firstElementChild).toBe(flushedAnnouncement);
+    expect(
+      within(screen.getByRole("article")).getByText("A partial response"),
+    ).toBeInTheDocument();
   });
 
   it("retains partial output and retries only the failed assistant response", async () => {
@@ -261,7 +445,13 @@ describe("ResearchAssistantChat response states", () => {
 
     render(<ResearchAssistantChat />);
 
-    const toolStatus = screen.getByRole("status");
+    const toolStatus = screen
+      .getAllByRole("status")
+      .find((status) => within(status).queryByText("Source metadata ready"));
+    expect(toolStatus).toBeDefined();
+    if (!toolStatus) {
+      throw new Error("Metadata tool status was not rendered.");
+    }
     expect(
       within(toolStatus).getByText("Source metadata ready"),
     ).toBeInTheDocument();

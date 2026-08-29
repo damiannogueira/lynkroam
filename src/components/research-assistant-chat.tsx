@@ -20,6 +20,16 @@ const EXAMPLE_PROMPTS = [
   "Inspect this webpage source: https://example.com",
 ];
 
+type AssistantTextSnapshot = {
+  id: string;
+  text: string;
+};
+
+type ResponseAnnouncement = {
+  sequence: number;
+  text: string;
+};
+
 function isNearBottom(container: HTMLDivElement) {
   return (
     container.scrollHeight - container.scrollTop - container.clientHeight <=
@@ -49,6 +59,40 @@ function newestAssistantHasVisibleContent(
   return false;
 }
 
+function getNewestAssistantText(
+  messages: ResearchAssistantUIMessage[],
+): AssistantTextSnapshot | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message.role === "user") {
+      return null;
+    }
+
+    if (message.role === "assistant") {
+      return {
+        id: message.id,
+        text: message.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join(""),
+      };
+    }
+  }
+
+  return null;
+}
+
+function getCompleteSentenceLength(text: string) {
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    if (text[index] === "." || text[index] === "?" || text[index] === "!") {
+      return index + 1;
+    }
+  }
+
+  return 0;
+}
+
 export function ResearchAssistantChat() {
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
@@ -57,6 +101,12 @@ export function ResearchAssistantChat() {
   const isFollowingLatestRef = useRef(true);
   const previousScrollTopRef = useRef(0);
   const retryInFlightRef = useRef(false);
+  const trackedAssistantMessageIdRef = useRef<string | null>(null);
+  const announcedAssistantTextLengthRef = useRef(0);
+  const announcementsInitializedRef = useRef(false);
+  const responseAnnouncementSequenceRef = useRef(0);
+  const [responseAnnouncement, setResponseAnnouncement] =
+    useState<ResponseAnnouncement | null>(null);
   const {
     messages,
     sendMessage,
@@ -80,6 +130,70 @@ export function ResearchAssistantChat() {
       previousScrollTopRef.current = conversation.scrollTop;
     }
   }, [error, isWaitingForText, messages]);
+
+  useEffect(() => {
+    const assistantText = getNewestAssistantText(messages);
+    const isInitialAnnouncementPass = !announcementsInitializedRef.current;
+    announcementsInitializedRef.current = true;
+
+    if (!assistantText) {
+      return;
+    }
+
+    if (trackedAssistantMessageIdRef.current !== assistantText.id) {
+      trackedAssistantMessageIdRef.current = assistantText.id;
+      announcedAssistantTextLengthRef.current = 0;
+      setResponseAnnouncement(null);
+    }
+
+    if (isInitialAnnouncementPass && status !== "streaming") {
+      announcedAssistantTextLengthRef.current = assistantText.text.length;
+      return;
+    }
+
+    const announcedLength = Math.min(
+      announcedAssistantTextLengthRef.current,
+      assistantText.text.length,
+    );
+    const unannouncedText = assistantText.text.slice(announcedLength);
+
+    if (status === "streaming") {
+      const completeSentenceLength = getCompleteSentenceLength(unannouncedText);
+
+      if (completeSentenceLength === 0) {
+        return;
+      }
+
+      announcedAssistantTextLengthRef.current =
+        announcedLength + completeSentenceLength;
+      const completeText = unannouncedText
+        .slice(0, completeSentenceLength)
+        .trim();
+
+      if (completeText) {
+        responseAnnouncementSequenceRef.current += 1;
+        setResponseAnnouncement({
+          sequence: responseAnnouncementSequenceRef.current,
+          text: completeText,
+        });
+      }
+
+      return;
+    }
+
+    if (status === "ready" || status === "error") {
+      announcedAssistantTextLengthRef.current = assistantText.text.length;
+      const remainingText = unannouncedText.trim();
+
+      if (remainingText) {
+        responseAnnouncementSequenceRef.current += 1;
+        setResponseAnnouncement({
+          sequence: responseAnnouncementSequenceRef.current,
+          text: remainingText,
+        });
+      }
+    }
+  }, [messages, status]);
 
   function handleConversationScroll() {
     const conversation = conversationRef.current;
@@ -320,6 +434,20 @@ export function ResearchAssistantChat() {
           >
             Jump to latest
           </button>
+        ) : null}
+      </div>
+
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label="Research Assistant response updates"
+      >
+        {responseAnnouncement ? (
+          <span key={responseAnnouncement.sequence}>
+            {responseAnnouncement.text}
+          </span>
         ) : null}
       </div>
 
