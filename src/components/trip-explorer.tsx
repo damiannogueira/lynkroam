@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 const destinations = [
   {
@@ -48,6 +48,7 @@ const destinations = [
 type Destination = (typeof destinations)[number];
 type RenderMode =
   | "checking"
+  | "ready"
   | "interactive"
   | "reduced-motion"
   | "save-data"
@@ -81,9 +82,11 @@ function supportsWebGL() {
 }
 
 function StaticDestinationPreview({
+  action,
   destination,
   label = "Static destination preview",
 }: {
+  action?: ReactNode;
   destination: Destination;
   label?: string;
 }) {
@@ -107,9 +110,12 @@ function StaticDestinationPreview({
       />
 
       <div className="relative flex h-full flex-col justify-between">
-        <span className="w-fit rounded-pill border border-border bg-surface/90 px-3 py-1 text-small font-semibold text-muted">
-          {label}
-        </span>
+        <div className="flex items-start justify-between gap-3">
+          <span className="w-fit rounded-pill border border-border bg-surface/90 px-3 py-1 text-small font-semibold text-muted">
+            {label}
+          </span>
+          {action}
+        </div>
 
         <div className="flex items-end justify-between gap-4">
           <div className="max-w-reading rounded-card border border-border bg-surface/90 p-4 shadow-elevated sm:p-5">
@@ -149,12 +155,20 @@ const TripExplorerScene = dynamic(
     ),
   {
     ssr: false,
-    loading: () => null,
+    loading: () => (
+      <p
+        className="absolute right-5 top-5 rounded-pill border border-border bg-surface/95 px-4 py-2 text-small font-semibold text-muted shadow-elevated"
+        role="status"
+      >
+        Loading 3D view…
+      </p>
+    ),
   },
 );
 
 const fallbackLabels: Record<Exclude<RenderMode, "interactive">, string> = {
-  checking: "Preparing interactive scene",
+  checking: "Static destination preview",
+  ready: "Static destination preview",
   "reduced-motion": "Static preview — reduced motion",
   "save-data": "Static preview — data saver",
   "no-webgl": "Static preview — 3D unavailable",
@@ -165,6 +179,7 @@ export function TripExplorer() {
     destinations[0],
   );
   const [renderMode, setRenderMode] = useState<RenderMode>("checking");
+  const [threeDRequested, setThreeDRequested] = useState(false);
 
   useEffect(() => {
     const reducedMotionQuery = window.matchMedia(
@@ -185,6 +200,11 @@ export function TripExplorer() {
         return;
       }
 
+      if (!threeDRequested) {
+        setRenderMode("ready");
+        return;
+      }
+
       webGLAvailable ??= supportsWebGL();
       setRenderMode(webGLAvailable ? "interactive" : "no-webgl");
     }
@@ -195,7 +215,12 @@ export function TripExplorer() {
     return () => {
       reducedMotionQuery.removeEventListener("change", resolveRenderMode);
     };
-  }, []);
+  }, [threeDRequested]);
+
+  function handleLaunchThreeD() {
+    setRenderMode("checking");
+    setThreeDRequested(true);
+  }
 
   return (
     <section className="space-y-6" aria-labelledby="trip-explorer-heading">
@@ -244,7 +269,7 @@ export function TripExplorer() {
             <div className="absolute inset-0" aria-hidden="true">
               <StaticDestinationPreview
                 destination={selectedDestination}
-                label="Preparing interactive scene"
+                label="Static destination preview"
               />
             </div>
             <div className="absolute inset-0">
@@ -253,6 +278,17 @@ export function TripExplorer() {
           </div>
         ) : (
           <StaticDestinationPreview
+            action={
+              renderMode === "ready" ? (
+                <button
+                  className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-control border border-brand bg-surface/95 px-4 py-2 text-label font-semibold text-brand shadow-elevated transition-colors hover:bg-brand-soft"
+                  type="button"
+                  onClick={handleLaunchThreeD}
+                >
+                  Launch 3D view
+                </button>
+              ) : null
+            }
             destination={selectedDestination}
             label={fallbackLabels[renderMode]}
           />

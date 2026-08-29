@@ -27,6 +27,7 @@ const originalConnection = Object.getOwnPropertyDescriptor(
 );
 
 let reducedMotion = false;
+let webGLAvailable = true;
 let webGLContextRequests = 0;
 const reducedMotionListeners = new Set<() => void>();
 
@@ -37,6 +38,7 @@ function setReducedMotion(matches: boolean) {
 
 beforeEach(() => {
   reducedMotion = false;
+  webGLAvailable = true;
   webGLContextRequests = 0;
   reducedMotionListeners.clear();
 
@@ -70,7 +72,7 @@ beforeEach(() => {
     value: (contextId: string) => {
       if (contextId === "webgl" || contextId === "webgl2") {
         webGLContextRequests += 1;
-        return { getExtension: () => null };
+        return webGLAvailable ? { getExtension: () => null } : null;
       }
 
       return null;
@@ -97,28 +99,33 @@ afterEach(() => {
       "getContext",
       originalGetContext,
     );
+  } else {
+    Reflect.deleteProperty(HTMLCanvasElement.prototype, "getContext");
   }
 });
 
 describe("TripExplorer", () => {
-  it("updates the selected destination and interactive scene", async () => {
+  it("keeps 3D gated until the user launches it", async () => {
     const user = userEvent.setup();
 
     render(<TripExplorer />);
 
     expect(
+      await screen.findByRole("button", { name: "Launch 3D view" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("button", { name: /Barcelona/, pressed: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("figure", { name: "Barcelona" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
         "Compare neighborhood bases, group architecture stops by area, and keep flexible meal options nearby.",
       ),
     ).toBeInTheDocument();
-    expect(
-      await screen.findByRole("img", {
-        name: "Interactive scene for barcelona",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
 
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
 
@@ -134,8 +141,19 @@ describe("TripExplorer", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Interactive scene for lisbon" }),
+      screen.getByRole("figure", { name: "Lisbon" }),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
+
+    expect(
+      await screen.findByRole("img", {
+        name: "Interactive scene for lisbon",
+      }),
+    ).toBeInTheDocument();
+    expect(webGLContextRequests).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Tokyo" }));
 
@@ -152,7 +170,7 @@ describe("TripExplorer", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps destination selection functional in reduced-motion mode", async () => {
+  it("keeps the static experience in reduced-motion mode", async () => {
     const user = userEvent.setup();
     reducedMotion = true;
 
@@ -171,6 +189,9 @@ describe("TripExplorer", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(webGLContextRequests).toBe(0);
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
 
@@ -184,14 +205,94 @@ describe("TripExplorer", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Compare transit access with walking effort, then shortlist viewpoints and food areas that fit the same route.",
+      ),
+    ).toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
   });
 
-  it("responds to live reduced-motion preference changes", async () => {
+  it("keeps the static experience when Save-Data is enabled", async () => {
+    const user = userEvent.setup();
+
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { saveData: true },
+    });
+
+    render(<TripExplorer />);
+
+    expect(
+      await screen.findByText("Static preview — data saver"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Tokyo" }));
+
+    expect(
+      screen.getByRole("button", { name: /Tokyo/, pressed: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("figure", { name: "Tokyo" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Group decisions by rail corridor, compare district priorities, and leave space for discoveries between planned anchors.",
+      ),
+    ).toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
+  });
+
+  it("falls back when WebGL is unavailable after launch", async () => {
+    const user = userEvent.setup();
+    webGLAvailable = false;
+
+    render(<TripExplorer />);
+
+    expect(
+      await screen.findByRole("button", { name: "Launch 3D view" }),
+    ).toBeInTheDocument();
+    expect(webGLContextRequests).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Lisbon" }));
+    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
+
+    expect(
+      await screen.findByText("Static preview — 3D unavailable"),
+    ).toBeInTheDocument();
+    expect(webGLContextRequests).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Lisbon/, pressed: true }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Tokyo" }));
+
+    expect(
+      screen.getByRole("button", { name: /Tokyo/, pressed: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("figure", { name: "Tokyo" })).toBeInTheDocument();
+  });
+
+  it("preserves launched 3D intent across reduced-motion changes", async () => {
     const user = userEvent.setup();
 
     render(<TripExplorer />);
 
+    expect(
+      await screen.findByRole("button", { name: "Launch 3D view" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
+    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
     expect(
       await screen.findByRole("img", {
         name: "Interactive scene for lisbon",
@@ -206,6 +307,9 @@ describe("TripExplorer", () => {
     expect(
       screen.getByText("Static preview — reduced motion"),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Lisbon/, pressed: true }),
     ).toBeInTheDocument();
@@ -223,5 +327,8 @@ describe("TripExplorer", () => {
     expect(
       screen.getByRole("button", { name: /Lisbon/, pressed: true }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Launch 3D view" }),
+    ).not.toBeInTheDocument();
   });
 });
