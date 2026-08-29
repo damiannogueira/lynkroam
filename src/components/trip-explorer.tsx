@@ -14,7 +14,7 @@ const destinations = [
       "Compare neighborhood bases, group architecture stops by area, and keep flexible meal options nearby.",
     initials: "BCN",
     sceneClass: "bg-brand-soft",
-    markerClass: "bg-accent text-surface",
+    markerClass: "bg-accent-strong text-surface",
     horizonClass: "bg-brand",
   },
   {
