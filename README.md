@@ -161,6 +161,14 @@ The intended responsive review widths are 375px and 1280px.
 
 The live `/motion` demo uses approximately 150ms ease-out hover/focus feedback, a 100ms ease-out active press, and 200ms ease-out lifecycle-content and state color/shadow transitions. Its deterministic action delay is 900ms; success remains visible for 1200ms, while error remains for 1500ms because recovery feedback benefits from slightly more reading time. Fast direct-input feedback feels immediate, while the slightly slower lifecycle changes remain perceptible without feeling sluggish; transform and opacity provide the primary motion without animating width, height, or other layout properties, and `prefers-reduced-motion` removes movement while preserving loading, success, error, and focus feedback.
 
+## FE-AA2 — 3D Trip Explorer
+
+The [`/explore`](https://lynkroam-git-fe-aa2-first-3d-e-54aa93-damian-nogueira-developer.vercel.app/explore) experience uses React Three Fiber and Three.js to present procedural Barcelona, Lisbon, and Tokyo compositions. Destination selection changes both the research context and visual composition, while the useful static preview remains available before the user explicitly chooses `Launch 3D view`. Reduced-motion, Save-Data, and unavailable-WebGL conditions retain the static experience, and the controls remain usable on mobile and touch devices.
+
+**Performance.** The scene uses procedural geometry with zero external model or texture bytes. Its dynamically isolated Three/R3F payload is approximately 234 KB gzip and loads only after explicit user launch; `frameloop="demand"` and a DPR capped at 1–1.5 limit rendering cost, while reduced-motion and Save-Data avoid loading the scene. A clean Lighthouse Mobile audit of the deployed Preview recorded 91 Performance, 96 Accessibility, 1.6 s LCP, 360 ms TBT, and 0 CLS. The initial payload was approximately 231 KiB, with Three/R3F absent from the initial page-load path.
+
+**With more time.** I would add richer destination-specific procedural detail, optional camera transitions or touch gestures that continue to respect reduced motion, and a reusable scene-load failure boundary with retry, alongside real-user performance telemetry on physical mobile devices.
+
 ## Explicit current non-goals
 
 The current application does not implement:
