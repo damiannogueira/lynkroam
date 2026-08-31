@@ -61,7 +61,7 @@ export function FetchUrlMetadataTool({ part }: FetchUrlMetadataToolProps) {
       >
         <div className="flex items-center gap-3">
           <span
-            className="flex h-6 w-6 items-center justify-center rounded-pill border border-accent text-small font-semibold text-accent"
+            className="flex h-6 w-6 items-center justify-center rounded-pill border border-accent text-small font-semibold text-accent-strong"
             aria-hidden="true"
           >
             …
@@ -98,13 +98,13 @@ export function FetchUrlMetadataTool({ part }: FetchUrlMetadataToolProps) {
         >
           <div className="flex items-start gap-3">
             <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-accent text-small font-semibold text-accent"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-pill border border-accent text-small font-semibold text-accent-strong"
               aria-hidden="true"
             >
               i
             </span>
             <div className="min-w-0">
-              <p className="text-small font-semibold uppercase tracking-[0.12em] text-accent">
+              <p className="text-small font-semibold uppercase tracking-[0.12em] text-accent-strong">
                 No descriptive metadata found
               </p>
               <p className="mt-1 break-words text-small text-muted">
@@ -149,9 +149,9 @@ export function FetchUrlMetadataTool({ part }: FetchUrlMetadataToolProps) {
             <p className="text-small font-semibold uppercase tracking-[0.12em] text-positive">
               Source metadata ready
             </p>
-            <h4 className="mt-1 break-words text-body font-semibold text-ink">
+            <h3 className="mt-1 break-words text-body font-semibold text-ink">
               {title ?? "Title unavailable"}
-            </h4>
+            </h3>
             <p className="mt-1 break-words text-small text-muted">
               {siteName ? `${siteName} · ${hostname}` : hostname}
             </p>

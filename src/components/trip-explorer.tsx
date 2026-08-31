@@ -14,7 +14,7 @@ const destinations = [
       "Compare neighborhood bases, group architecture stops by area, and keep flexible meal options nearby.",
     initials: "BCN",
     sceneClass: "bg-brand-soft",
-    markerClass: "bg-accent text-surface",
+    markerClass: "bg-accent-strong text-surface",
     horizonClass: "bg-brand",
   },
   {
@@ -295,7 +295,7 @@ export function TripExplorer() {
         )}
 
         <article className="rounded-panel border border-border bg-surface-elevated p-6 shadow-card sm:p-8">
-          <p className="text-label font-semibold uppercase tracking-[0.14em] text-accent">
+          <p className="text-label font-semibold uppercase tracking-[0.14em] text-accent-strong">
             Research direction
           </p>
           <h3 className="mt-3 text-heading font-semibold tracking-[-0.025em] text-ink">

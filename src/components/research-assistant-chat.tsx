@@ -1,15 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { useChat } from "@ai-sdk/react";
 import { FetchUrlMetadataTool } from "@/components/fetch-url-metadata-tool";
+import type {
+  ResearchAssistantRuntimeActions,
+  ResearchAssistantRuntimeSnapshot,
+} from "@/components/research-assistant-chat-runtime-types";
 import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
+
+const ResearchAssistantChatRuntime = dynamic(
+  () =>
+    import("@/components/research-assistant-chat-runtime").then(
+      (module) => module.ResearchAssistantChatRuntime,
+    ),
+  { ssr: false },
+);
 
 const NEAR_BOTTOM_THRESHOLD = 48;
 const GENERIC_ERROR_MESSAGE =
@@ -19,6 +32,27 @@ const EXAMPLE_PROMPTS = [
   "What important research might I still be missing?",
   "Inspect this webpage source: https://example.com",
 ];
+
+type AssistantTextSnapshot = {
+  id: string;
+  text: string;
+};
+
+type ResponseAnnouncement = {
+  sequence: number;
+  text: string;
+};
+
+type PendingSubmission = {
+  text: string;
+  inputAtQueue: string;
+};
+
+const INITIAL_RUNTIME_SNAPSHOT: ResearchAssistantRuntimeSnapshot = {
+  messages: [],
+  status: "ready",
+  error: undefined,
+};
 
 function isNearBottom(container: HTMLDivElement) {
   return (
@@ -49,28 +83,95 @@ function newestAssistantHasVisibleContent(
   return false;
 }
 
+function getNewestAssistantText(
+  messages: ResearchAssistantUIMessage[],
+): AssistantTextSnapshot | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (message.role === "user") {
+      return null;
+    }
+
+    if (message.role === "assistant") {
+      return {
+        id: message.id,
+        text: message.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join(""),
+      };
+    }
+  }
+
+  return null;
+}
+
+function getCompleteSentenceLength(text: string) {
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    if (text[index] === "." || text[index] === "?" || text[index] === "!") {
+      return index + 1;
+    }
+  }
+
+  return 0;
+}
+
 export function ResearchAssistantChat() {
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [runtimeRequested, setRuntimeRequested] = useState(false);
+  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
+  const [runtimeSnapshot, setRuntimeSnapshot] =
+    useState<ResearchAssistantRuntimeSnapshot>(INITIAL_RUNTIME_SNAPSHOT);
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const runtimeActionsRef = useRef<ResearchAssistantRuntimeActions | null>(
+    null,
+  );
+  const pendingSubmissionRef = useRef<PendingSubmission | null>(null);
   const isFollowingLatestRef = useRef(true);
   const previousScrollTopRef = useRef(0);
   const retryInFlightRef = useRef(false);
-  const {
-    messages,
-    sendMessage,
-    regenerate,
-    status,
-    stop,
-    error,
-    clearError,
-  } = useChat<ResearchAssistantUIMessage>();
+  const trackedAssistantMessageIdRef = useRef<string | null>(null);
+  const announcedAssistantTextLengthRef = useRef(0);
+  const announcementsInitializedRef = useRef(false);
+  const responseAnnouncementSequenceRef = useRef(0);
+  const [responseAnnouncement, setResponseAnnouncement] =
+    useState<ResponseAnnouncement | null>(null);
+  const { messages, status, error } = runtimeSnapshot;
   const isBusy = status === "submitted" || status === "streaming";
   const isWaitingForText =
     status === "submitted" ||
     (status === "streaming" &&
       !newestAssistantHasVisibleContent(messages));
+
+  const handleRuntimeActionsChange = useCallback(
+    (actions: ResearchAssistantRuntimeActions | null) => {
+      runtimeActionsRef.current = actions;
+
+      const pendingSubmission = pendingSubmissionRef.current;
+
+      if (!actions || pendingSubmission === null) {
+        return;
+      }
+
+      pendingSubmissionRef.current = null;
+      setIsPreparingSubmission(false);
+      setInput((currentInput) =>
+        currentInput === pendingSubmission.inputAtQueue ? "" : currentInput,
+      );
+      void actions.send(pendingSubmission.text);
+    },
+    [],
+  );
+
+  const handleRuntimeSnapshotChange = useCallback(
+    (snapshot: ResearchAssistantRuntimeSnapshot) => {
+      setRuntimeSnapshot(snapshot);
+    },
+    [],
+  );
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -80,6 +181,70 @@ export function ResearchAssistantChat() {
       previousScrollTopRef.current = conversation.scrollTop;
     }
   }, [error, isWaitingForText, messages]);
+
+  useEffect(() => {
+    const assistantText = getNewestAssistantText(messages);
+    const isInitialAnnouncementPass = !announcementsInitializedRef.current;
+    announcementsInitializedRef.current = true;
+
+    if (!assistantText) {
+      return;
+    }
+
+    if (trackedAssistantMessageIdRef.current !== assistantText.id) {
+      trackedAssistantMessageIdRef.current = assistantText.id;
+      announcedAssistantTextLengthRef.current = 0;
+      setResponseAnnouncement(null);
+    }
+
+    if (isInitialAnnouncementPass && status !== "streaming") {
+      announcedAssistantTextLengthRef.current = assistantText.text.length;
+      return;
+    }
+
+    const announcedLength = Math.min(
+      announcedAssistantTextLengthRef.current,
+      assistantText.text.length,
+    );
+    const unannouncedText = assistantText.text.slice(announcedLength);
+
+    if (status === "streaming") {
+      const completeSentenceLength = getCompleteSentenceLength(unannouncedText);
+
+      if (completeSentenceLength === 0) {
+        return;
+      }
+
+      announcedAssistantTextLengthRef.current =
+        announcedLength + completeSentenceLength;
+      const completeText = unannouncedText
+        .slice(0, completeSentenceLength)
+        .trim();
+
+      if (completeText) {
+        responseAnnouncementSequenceRef.current += 1;
+        setResponseAnnouncement({
+          sequence: responseAnnouncementSequenceRef.current,
+          text: completeText,
+        });
+      }
+
+      return;
+    }
+
+    if (status === "ready" || status === "error") {
+      announcedAssistantTextLengthRef.current = assistantText.text.length;
+      const remainingText = unannouncedText.trim();
+
+      if (remainingText) {
+        responseAnnouncementSequenceRef.current += 1;
+        setResponseAnnouncement({
+          sequence: responseAnnouncementSequenceRef.current,
+          text: remainingText,
+        });
+      }
+    }
+  }, [messages, status]);
 
   function handleConversationScroll() {
     const conversation = conversationRef.current;
@@ -121,30 +286,42 @@ export function ResearchAssistantChat() {
 
     const text = input.trim();
 
-    if (!text || isBusy) {
+    if (!text || isBusy || pendingSubmissionRef.current !== null) {
       return;
     }
 
-    if (error) {
-      clearError();
+    const runtimeActions = runtimeActionsRef.current;
+
+    if (!runtimeActions) {
+      setRuntimeRequested(true);
+      pendingSubmissionRef.current = {
+        text,
+        inputAtQueue: input,
+      };
+      setIsPreparingSubmission(true);
+      return;
     }
 
     setInput("");
-    void sendMessage({ text });
+    void runtimeActions.send(text);
   }
 
   function handleExamplePrompt(prompt: string) {
+    setRuntimeRequested(true);
     setInput(prompt);
     composerRef.current?.focus();
   }
 
   function handleRetry() {
-    if (retryInFlightRef.current || isBusy) {
+    const runtimeActions = runtimeActionsRef.current;
+
+    if (retryInFlightRef.current || isBusy || !runtimeActions) {
       return;
     }
 
     retryInFlightRef.current = true;
-    void regenerate()
+    void runtimeActions
+      .retry()
       .catch(() => undefined)
       .finally(() => {
         retryInFlightRef.current = false;
@@ -169,6 +346,12 @@ export function ResearchAssistantChat() {
       className="overflow-hidden rounded-panel border border-border bg-surface-elevated shadow-card"
       aria-label="Research Assistant conversation"
     >
+      {runtimeRequested ? (
+        <ResearchAssistantChatRuntime
+          onActionsChange={handleRuntimeActionsChange}
+          onSnapshotChange={handleRuntimeSnapshotChange}
+        />
+      ) : null}
       <div className="relative">
         <div
           className="max-h-[32rem] min-h-80 space-y-5 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
@@ -323,6 +506,20 @@ export function ResearchAssistantChat() {
         ) : null}
       </div>
 
+      <div
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label="Research Assistant response updates"
+      >
+        {responseAnnouncement ? (
+          <span key={responseAnnouncement.sequence}>
+            {responseAnnouncement.text}
+          </span>
+        ) : null}
+      </div>
+
       <form
         className="border-t border-border bg-surface p-4 sm:p-6"
         onSubmit={handleSubmit}
@@ -341,9 +538,16 @@ export function ResearchAssistantChat() {
           placeholder="Ask about your travel research..."
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onFocus={() => setRuntimeRequested(true)}
           onKeyDown={handleComposerKeyDown}
           disabled={isBusy}
         />
+
+        {isPreparingSubmission ? (
+          <p className="sr-only" role="status" aria-live="polite">
+            Preparing Research Assistant&hellip;
+          </p>
+        ) : null}
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-muted">
@@ -352,9 +556,9 @@ export function ResearchAssistantChat() {
           </p>
           {isBusy ? (
             <button
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-strong bg-surface px-5 py-3 text-label font-semibold text-ink transition-colors hover:border-accent hover:text-accent sm:w-auto"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-strong bg-surface px-5 py-3 text-label font-semibold text-ink transition-colors hover:border-accent hover:text-accent-strong sm:w-auto"
               type="button"
-              onClick={() => void stop()}
+              onClick={() => void runtimeActionsRef.current?.stop()}
             >
               Stop
             </button>
@@ -362,9 +566,13 @@ export function ResearchAssistantChat() {
             <button
               className="inline-flex min-h-11 w-full items-center justify-center rounded-control bg-brand px-5 py-3 text-label font-semibold text-brand-contrast transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-muted sm:w-auto"
               type="submit"
-              disabled={input.trim().length === 0}
+              disabled={
+                isPreparingSubmission || input.trim().length === 0
+              }
             >
-              Send
+              {isPreparingSubmission
+                ? "Preparing Research Assistant…"
+                : "Send"}
             </button>
           )}
         </div>

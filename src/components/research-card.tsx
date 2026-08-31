@@ -33,7 +33,7 @@ export function ResearchCard({
   return (
     <article className="rounded-card border border-border bg-surface-elevated p-card shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-small font-semibold uppercase tracking-[0.12em] text-accent">
+        <p className="text-small font-semibold uppercase tracking-[0.12em] text-accent-strong">
           {category}
         </p>
         <span
