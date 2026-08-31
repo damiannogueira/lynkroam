@@ -1,60 +1,221 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { UseChatHelpers } from "@ai-sdk/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ResearchAssistantChat } from "@/components/research-assistant-chat";
+import type {
+  ResearchAssistantRuntimeActions,
+  ResearchAssistantRuntimeControllerProps,
+  ResearchAssistantRuntimeSnapshot,
+} from "@/components/research-assistant-chat-runtime-types";
 import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
-type ResearchAssistantChatState = Pick<
-  UseChatHelpers<ResearchAssistantUIMessage>,
-  | "messages"
-  | "sendMessage"
-  | "regenerate"
-  | "status"
-  | "stop"
-  | "error"
-  | "clearError"
->;
-
-const chatMocks = vi.hoisted(() => ({
-  useChat: vi.fn<() => ResearchAssistantChatState>(),
-  sendMessage: vi.fn<ResearchAssistantChatState["sendMessage"]>(),
-  regenerate: vi.fn<ResearchAssistantChatState["regenerate"]>(),
-  stop: vi.fn<ResearchAssistantChatState["stop"]>(),
-  clearError: vi.fn<ResearchAssistantChatState["clearError"]>(),
+const runtimeMocks = vi.hoisted(() => ({
+  controller: vi.fn(),
+  controllerProps: null as ResearchAssistantRuntimeControllerProps | null,
+  actions: {
+    send: vi.fn<ResearchAssistantRuntimeActions["send"]>(),
+    stop: vi.fn<ResearchAssistantRuntimeActions["stop"]>(),
+    retry: vi.fn<ResearchAssistantRuntimeActions["retry"]>(),
+  },
 }));
 
-vi.mock("@ai-sdk/react", () => ({
-  useChat: chatMocks.useChat,
+vi.mock("@/components/research-assistant-chat-runtime", () => ({
+  ResearchAssistantChatRuntime: (
+    props: ResearchAssistantRuntimeControllerProps,
+  ) => {
+    runtimeMocks.controller(props);
+    runtimeMocks.controllerProps = props;
+    return null;
+  },
 }));
 
-function setChatState({
-  messages,
-  status,
+function createRuntimeSnapshot({
+  messages = [],
+  status = "ready",
   error,
-}: Pick<ResearchAssistantChatState, "messages" | "status" | "error">) {
-  chatMocks.useChat.mockReturnValue({
-    messages,
-    status,
-    error,
-    sendMessage: chatMocks.sendMessage,
-    regenerate: chatMocks.regenerate,
-    stop: chatMocks.stop,
-    clearError: chatMocks.clearError,
+}: Partial<ResearchAssistantRuntimeSnapshot> = {}): ResearchAssistantRuntimeSnapshot {
+  return { messages, status, error };
+}
+
+function getRuntimeControllerProps() {
+  const controllerProps = runtimeMocks.controllerProps;
+
+  if (!controllerProps) {
+    throw new Error("Research Assistant runtime controller was not mounted.");
+  }
+
+  return controllerProps;
+}
+
+function publishRuntimeSnapshot(snapshot: ResearchAssistantRuntimeSnapshot) {
+  act(() => {
+    getRuntimeControllerProps().onSnapshotChange(snapshot);
   });
 }
 
+function registerRuntimeActions() {
+  act(() => {
+    getRuntimeControllerProps().onActionsChange(runtimeMocks.actions);
+  });
+}
+
+function renderChat(
+  snapshot: ResearchAssistantRuntimeSnapshot = createRuntimeSnapshot(),
+  { registerActions = true } = {},
+) {
+  const result = render(<ResearchAssistantChat />);
+
+  publishRuntimeSnapshot(snapshot);
+
+  if (registerActions) {
+    registerRuntimeActions();
+  }
+
+  return result;
+}
+
 beforeEach(() => {
-  chatMocks.useChat.mockReset();
-  chatMocks.sendMessage.mockReset();
-  chatMocks.sendMessage.mockResolvedValue(undefined);
-  chatMocks.regenerate.mockReset();
-  chatMocks.regenerate.mockResolvedValue(undefined);
-  chatMocks.stop.mockReset();
-  chatMocks.clearError.mockReset();
+  runtimeMocks.controller.mockReset();
+  runtimeMocks.controllerProps = null;
+  runtimeMocks.actions.send.mockReset();
+  runtimeMocks.actions.send.mockResolvedValue(undefined);
+  runtimeMocks.actions.retry.mockReset();
+  runtimeMocks.actions.retry.mockResolvedValue(undefined);
+  runtimeMocks.actions.stop.mockReset();
+  runtimeMocks.actions.stop.mockResolvedValue(undefined);
 });
 
 describe("ResearchAssistantChat response states", () => {
+  it("mounts the runtime bridge eagerly while keeping the composer usable", async () => {
+    const user = userEvent.setup();
+
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    expect(runtimeMocks.controller).toHaveBeenCalled();
+    const messageInput = screen.getByLabelText("Message");
+    expect(messageInput).toBeEnabled();
+    await user.type(messageInput, "The composer is immediately available.");
+    expect(messageInput).toHaveValue("The composer is immediately available.");
+  });
+
+  it("queues one early submission until runtime actions register", async () => {
+    const user = userEvent.setup();
+
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    const messageInput = screen.getByLabelText("Message");
+    await user.type(messageInput, "  Compare the neighborhoods.  ");
+    await user.keyboard("{Enter}{Enter}");
+
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
+    expect(messageInput).toHaveValue("  Compare the neighborhoods.  ");
+
+    registerRuntimeActions();
+
+    await waitFor(() =>
+      expect(runtimeMocks.actions.send).toHaveBeenCalledWith(
+        "Compare the neighborhoods.",
+      ),
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
+    expect(messageInput).toHaveValue("");
+  });
+
+  it("preserves composer edits made after an early submission is queued", async () => {
+    const user = userEvent.setup();
+
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    const messageInput = screen.getByLabelText("Message");
+    await user.type(messageInput, "Compare the neighborhoods.");
+    await user.keyboard("{Enter}");
+    await user.type(messageInput, " Keep this follow-up draft.");
+
+    registerRuntimeActions();
+
+    await waitFor(() =>
+      expect(runtimeMocks.actions.send).toHaveBeenCalledWith(
+        "Compare the neighborhoods.",
+      ),
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
+    expect(messageInput).toHaveValue(
+      "Compare the neighborhoods. Keep this follow-up draft.",
+    );
+  });
+
+  it("preserves whitespace-only edits made after queuing", async () => {
+    const user = userEvent.setup();
+
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    const messageInput = screen.getByLabelText("Message");
+    await user.type(messageInput, "Hello");
+    await user.keyboard("{Enter}");
+    await user.type(messageInput, "   ");
+
+    registerRuntimeActions();
+
+    await waitFor(() =>
+      expect(runtimeMocks.actions.send).toHaveBeenCalledWith("Hello"),
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
+    expect(messageInput).toHaveValue("Hello   ");
+  });
+
+  it("prevents duplicate Send-button submissions while one is queued", async () => {
+    const user = userEvent.setup();
+
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    const messageInput = screen.getByLabelText("Message");
+    await user.type(messageInput, "Compare these options.");
+    const sendButton = screen.getByRole("button", { name: "Send" });
+    await user.click(sendButton);
+    await user.click(sendButton);
+
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
+    registerRuntimeActions();
+
+    await waitFor(() =>
+      expect(runtimeMocks.actions.send).toHaveBeenCalledWith(
+        "Compare these options.",
+      ),
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the textarea DOM node when the runtime bridge becomes ready", () => {
+    renderChat(createRuntimeSnapshot(), { registerActions: false });
+
+    const messageInput = screen.getByLabelText("Message");
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({ status: "submitted" }),
+    );
+    registerRuntimeActions();
+    publishRuntimeSnapshot(createRuntimeSnapshot());
+
+    expect(screen.getByLabelText("Message")).toBe(messageInput);
+  });
+
+  it("fills and focuses a starter prompt without sending", async () => {
+    const user = userEvent.setup();
+    renderChat();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Help me compare two travel priorities for this trip.",
+      }),
+    );
+
+    const messageInput = screen.getByLabelText("Message");
+    expect(messageInput).toHaveValue(
+      "Help me compare two travel priorities for this trip.",
+    );
+    expect(messageInput).toHaveFocus();
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
+  });
+
   it("shows pending feedback and busy controls after submission", () => {
     const userMessage = {
       id: "user-submitted",
@@ -62,13 +223,12 @@ describe("ResearchAssistantChat response states", () => {
       parts: [{ type: "text", text: "Compare these travel priorities." }],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [userMessage],
-      status: "submitted",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({
+        messages: [userMessage],
+        status: "submitted",
+      }),
+    );
 
     const pendingStatus = screen
       .getAllByRole("status")
@@ -96,13 +256,12 @@ describe("ResearchAssistantChat response states", () => {
       parts: [{ type: "step-start" }],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [structuralAssistantMessage],
-      status: "streaming",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({
+        messages: [structuralAssistantMessage],
+        status: "streaming",
+      }),
+    );
 
     const pendingStatus = screen
       .getAllByRole("status")
@@ -133,13 +292,12 @@ describe("ResearchAssistantChat response states", () => {
       ],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [streamingAssistantMessage],
-      status: "streaming",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({
+        messages: [streamingAssistantMessage],
+        status: "streaming",
+      }),
+    );
 
     expect(
       within(screen.getByRole("article")).getByText(
@@ -161,13 +319,12 @@ describe("ResearchAssistantChat response states", () => {
         parts: [{ type: "text", text, state }],
       }) satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [streamingMessage("An incomplete response", "streaming")],
-      status: "streaming",
-      error: undefined,
-    });
-
-    const { rerender } = render(<ResearchAssistantChat />);
+    const { rerender } = renderChat(
+      createRuntimeSnapshot({
+        messages: [streamingMessage("An incomplete response", "streaming")],
+        status: "streaming",
+      }),
+    );
     const responseUpdates = screen.getByRole("status", {
       name: "Research Assistant response updates",
     });
@@ -177,14 +334,19 @@ describe("ResearchAssistantChat response states", () => {
 
     const stopButton = screen.getByRole("button", { name: "Stop" });
     await user.click(stopButton);
-    expect(chatMocks.stop).toHaveBeenCalledTimes(1);
+    expect(runtimeMocks.actions.stop).toHaveBeenCalledTimes(1);
 
-    setChatState({
-      messages: [streamingMessage("An incomplete response is now complete.", "streaming")],
-      status: "streaming",
-      error: undefined,
-    });
-    rerender(<ResearchAssistantChat />);
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({
+        messages: [
+          streamingMessage(
+            "An incomplete response is now complete.",
+            "streaming",
+          ),
+        ],
+        status: "streaming",
+      }),
+    );
 
     await waitFor(() =>
       expect(responseUpdates).toHaveTextContent(
@@ -192,17 +354,17 @@ describe("ResearchAssistantChat response states", () => {
       ),
     );
 
-    setChatState({
-      messages: [
-        streamingMessage(
-          "An incomplete response is now complete. A second sentence! trailing words",
-          "streaming",
-        ),
-      ],
-      status: "streaming",
-      error: undefined,
-    });
-    rerender(<ResearchAssistantChat />);
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({
+        messages: [
+          streamingMessage(
+            "An incomplete response is now complete. A second sentence! trailing words",
+            "streaming",
+          ),
+        ],
+        status: "streaming",
+      }),
+    );
 
     await waitFor(() =>
       expect(responseUpdates).toHaveTextContent("A second sentence!"),
@@ -211,17 +373,16 @@ describe("ResearchAssistantChat response states", () => {
       "An incomplete response is now complete.",
     );
 
-    setChatState({
-      messages: [
-        streamingMessage(
-          "An incomplete response is now complete. A second sentence! trailing words",
-          "done",
-        ),
-      ],
-      status: "ready",
-      error: undefined,
-    });
-    rerender(<ResearchAssistantChat />);
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({
+        messages: [
+          streamingMessage(
+            "An incomplete response is now complete. A second sentence! trailing words",
+            "done",
+          ),
+        ],
+      }),
+    );
 
     await waitFor(() =>
       expect(responseUpdates).toHaveTextContent("trailing words"),
@@ -245,13 +406,12 @@ describe("ResearchAssistantChat response states", () => {
         parts: [{ type: "text", text, state: "streaming" }],
       }) satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [streamingMessage("Yes.")],
-      status: "streaming",
-      error: undefined,
-    });
-
-    const { rerender } = render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({
+        messages: [streamingMessage("Yes.")],
+        status: "streaming",
+      }),
+    );
     const responseUpdates = screen.getByRole("status", {
       name: "Research Assistant response updates",
     });
@@ -260,12 +420,12 @@ describe("ResearchAssistantChat response states", () => {
     const firstAnnouncement = responseUpdates.firstElementChild;
     expect(firstAnnouncement).not.toBeNull();
 
-    setChatState({
-      messages: [streamingMessage("Yes. Yes.")],
-      status: "streaming",
-      error: undefined,
-    });
-    rerender(<ResearchAssistantChat />);
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({
+        messages: [streamingMessage("Yes. Yes.")],
+        status: "streaming",
+      }),
+    );
 
     await waitFor(() =>
       expect(responseUpdates.firstElementChild).not.toBe(firstAnnouncement),
@@ -287,24 +447,24 @@ describe("ResearchAssistantChat response states", () => {
       ],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [partialAssistantMessage],
-      status: "streaming",
-      error: undefined,
-    });
-
-    const { rerender } = render(<ResearchAssistantChat />);
+    const { rerender } = renderChat(
+      createRuntimeSnapshot({
+        messages: [partialAssistantMessage],
+        status: "streaming",
+      }),
+    );
     const responseUpdates = screen.getByRole("status", {
       name: "Research Assistant response updates",
     });
     expect(responseUpdates).toBeEmptyDOMElement();
 
-    setChatState({
-      messages: [partialAssistantMessage],
-      status: "error",
-      error: new Error("Provider stream failed"),
-    });
-    rerender(<ResearchAssistantChat />);
+    publishRuntimeSnapshot(
+      createRuntimeSnapshot({
+        messages: [partialAssistantMessage],
+        status: "error",
+        error: new Error("Provider stream failed"),
+      }),
+    );
 
     await waitFor(() =>
       expect(responseUpdates).toHaveTextContent("A partial response"),
@@ -332,16 +492,18 @@ describe("ResearchAssistantChat response states", () => {
       ],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [partialAssistantMessage],
-      status: "error",
-      error: new Error("Sensitive provider failure"),
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({
+        messages: [partialAssistantMessage],
+        status: "error",
+        error: new Error("Sensitive provider failure"),
+      }),
+    );
 
     expect(
-      screen.getByText("This partial answer remains visible."),
+      within(screen.getByRole("article")).getByText(
+        "This partial answer remains visible.",
+      ),
     ).toBeInTheDocument();
     const alert = screen.getByRole("alert");
     expect(within(alert).getByText("Response interrupted")).toBeInTheDocument();
@@ -351,20 +513,14 @@ describe("ResearchAssistantChat response states", () => {
     });
     await user.click(retryButton);
 
-    expect(chatMocks.regenerate).toHaveBeenCalledTimes(1);
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    expect(runtimeMocks.actions.retry).toHaveBeenCalledTimes(1);
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
   });
 
   it("validates and trims the composer message before sending", async () => {
     const user = userEvent.setup();
 
-    setChatState({
-      messages: [],
-      status: "ready",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat();
 
     const messageInput = screen.getByLabelText("Message");
     const sendButton = screen.getByRole("button", { name: "Send" });
@@ -373,7 +529,7 @@ describe("ResearchAssistantChat response states", () => {
     await user.type(messageInput, "   ");
     expect(sendButton).toBeDisabled();
     await user.keyboard("{Enter}");
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
 
     await user.clear(messageInput);
     await user.type(messageInput, "  Compare location and room size.  ");
@@ -381,23 +537,17 @@ describe("ResearchAssistantChat response states", () => {
 
     await user.click(sendButton);
 
-    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
-      text: "Compare location and room size.",
-    });
-    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(runtimeMocks.actions.send).toHaveBeenCalledWith(
+      "Compare location and room size.",
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
     expect(messageInput).toHaveValue("");
   });
 
   it("keeps Shift+Enter as a newline and uses Enter to send", async () => {
     const user = userEvent.setup();
 
-    setChatState({
-      messages: [],
-      status: "ready",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat();
 
     const messageInput = screen.getByLabelText("Message");
     await user.type(messageInput, "Compare location");
@@ -405,14 +555,14 @@ describe("ResearchAssistantChat response states", () => {
     await user.type(messageInput, "and room size.");
 
     expect(messageInput).toHaveValue("Compare location\nand room size.");
-    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+    expect(runtimeMocks.actions.send).not.toHaveBeenCalled();
 
     await user.keyboard("{Enter}");
 
-    expect(chatMocks.sendMessage).toHaveBeenCalledWith({
-      text: "Compare location\nand room size.",
-    });
-    expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(runtimeMocks.actions.send).toHaveBeenCalledWith(
+      "Compare location\nand room size.",
+    );
+    expect(runtimeMocks.actions.send).toHaveBeenCalledTimes(1);
     expect(messageInput).toHaveValue("");
   });
 
@@ -437,13 +587,9 @@ describe("ResearchAssistantChat response states", () => {
       ],
     } satisfies ResearchAssistantUIMessage;
 
-    setChatState({
-      messages: [metadataAssistantMessage],
-      status: "ready",
-      error: undefined,
-    });
-
-    render(<ResearchAssistantChat />);
+    renderChat(
+      createRuntimeSnapshot({ messages: [metadataAssistantMessage] }),
+    );
 
     const toolStatus = screen
       .getAllByRole("status")

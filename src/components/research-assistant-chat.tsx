@@ -1,14 +1,19 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { useChat } from "@ai-sdk/react";
 import { FetchUrlMetadataTool } from "@/components/fetch-url-metadata-tool";
+import { ResearchAssistantChatRuntime } from "@/components/research-assistant-chat-runtime";
+import type {
+  ResearchAssistantRuntimeActions,
+  ResearchAssistantRuntimeSnapshot,
+} from "@/components/research-assistant-chat-runtime-types";
 import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
 const NEAR_BOTTOM_THRESHOLD = 48;
@@ -28,6 +33,17 @@ type AssistantTextSnapshot = {
 type ResponseAnnouncement = {
   sequence: number;
   text: string;
+};
+
+type PendingSubmission = {
+  text: string;
+  inputAtQueue: string;
+};
+
+const INITIAL_RUNTIME_SNAPSHOT: ResearchAssistantRuntimeSnapshot = {
+  messages: [],
+  status: "ready",
+  error: undefined,
 };
 
 function isNearBottom(container: HTMLDivElement) {
@@ -96,8 +112,14 @@ function getCompleteSentenceLength(text: string) {
 export function ResearchAssistantChat() {
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [runtimeSnapshot, setRuntimeSnapshot] =
+    useState<ResearchAssistantRuntimeSnapshot>(INITIAL_RUNTIME_SNAPSHOT);
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const runtimeActionsRef = useRef<ResearchAssistantRuntimeActions | null>(
+    null,
+  );
+  const pendingSubmissionRef = useRef<PendingSubmission | null>(null);
   const isFollowingLatestRef = useRef(true);
   const previousScrollTopRef = useRef(0);
   const retryInFlightRef = useRef(false);
@@ -107,20 +129,38 @@ export function ResearchAssistantChat() {
   const responseAnnouncementSequenceRef = useRef(0);
   const [responseAnnouncement, setResponseAnnouncement] =
     useState<ResponseAnnouncement | null>(null);
-  const {
-    messages,
-    sendMessage,
-    regenerate,
-    status,
-    stop,
-    error,
-    clearError,
-  } = useChat<ResearchAssistantUIMessage>();
+  const { messages, status, error } = runtimeSnapshot;
   const isBusy = status === "submitted" || status === "streaming";
   const isWaitingForText =
     status === "submitted" ||
     (status === "streaming" &&
       !newestAssistantHasVisibleContent(messages));
+
+  const handleRuntimeActionsChange = useCallback(
+    (actions: ResearchAssistantRuntimeActions | null) => {
+      runtimeActionsRef.current = actions;
+
+      const pendingSubmission = pendingSubmissionRef.current;
+
+      if (!actions || pendingSubmission === null) {
+        return;
+      }
+
+      pendingSubmissionRef.current = null;
+      setInput((currentInput) =>
+        currentInput === pendingSubmission.inputAtQueue ? "" : currentInput,
+      );
+      void actions.send(pendingSubmission.text);
+    },
+    [],
+  );
+
+  const handleRuntimeSnapshotChange = useCallback(
+    (snapshot: ResearchAssistantRuntimeSnapshot) => {
+      setRuntimeSnapshot(snapshot);
+    },
+    [],
+  );
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -235,16 +275,22 @@ export function ResearchAssistantChat() {
 
     const text = input.trim();
 
-    if (!text || isBusy) {
+    if (!text || isBusy || pendingSubmissionRef.current !== null) {
       return;
     }
 
-    if (error) {
-      clearError();
+    const runtimeActions = runtimeActionsRef.current;
+
+    if (!runtimeActions) {
+      pendingSubmissionRef.current = {
+        text,
+        inputAtQueue: input,
+      };
+      return;
     }
 
     setInput("");
-    void sendMessage({ text });
+    void runtimeActions.send(text);
   }
 
   function handleExamplePrompt(prompt: string) {
@@ -253,12 +299,15 @@ export function ResearchAssistantChat() {
   }
 
   function handleRetry() {
-    if (retryInFlightRef.current || isBusy) {
+    const runtimeActions = runtimeActionsRef.current;
+
+    if (retryInFlightRef.current || isBusy || !runtimeActions) {
       return;
     }
 
     retryInFlightRef.current = true;
-    void regenerate()
+    void runtimeActions
+      .retry()
       .catch(() => undefined)
       .finally(() => {
         retryInFlightRef.current = false;
@@ -283,6 +332,10 @@ export function ResearchAssistantChat() {
       className="overflow-hidden rounded-panel border border-border bg-surface-elevated shadow-card"
       aria-label="Research Assistant conversation"
     >
+      <ResearchAssistantChatRuntime
+        onActionsChange={handleRuntimeActionsChange}
+        onSnapshotChange={handleRuntimeSnapshotChange}
+      />
       <div className="relative">
         <div
           className="max-h-[32rem] min-h-80 space-y-5 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
@@ -482,7 +535,7 @@ export function ResearchAssistantChat() {
             <button
               className="inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border-strong bg-surface px-5 py-3 text-label font-semibold text-ink transition-colors hover:border-accent hover:text-accent-strong sm:w-auto"
               type="button"
-              onClick={() => void stop()}
+              onClick={() => void runtimeActionsRef.current?.stop()}
             >
               Stop
             </button>

@@ -50,7 +50,10 @@ test("completes the Research Assistant primary flow with a mocked AI response", 
   );
   await page.getByRole("button", { name: "Send" }).click();
 
-  await expect(page.getByText(assistantResponse)).toBeVisible();
+  const assistantMessage = page
+    .getByRole("article")
+    .filter({ hasText: assistantResponse });
+  await expect(assistantMessage.getByText(assistantResponse)).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   await expect(messageInput).toBeEnabled();
   expect(chatRequestCount).toBe(1);
