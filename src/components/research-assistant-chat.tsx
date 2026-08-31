@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -9,12 +10,19 @@ import {
   type KeyboardEvent,
 } from "react";
 import { FetchUrlMetadataTool } from "@/components/fetch-url-metadata-tool";
-import { ResearchAssistantChatRuntime } from "@/components/research-assistant-chat-runtime";
 import type {
   ResearchAssistantRuntimeActions,
   ResearchAssistantRuntimeSnapshot,
 } from "@/components/research-assistant-chat-runtime-types";
 import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
+
+const ResearchAssistantChatRuntime = dynamic(
+  () =>
+    import("@/components/research-assistant-chat-runtime").then(
+      (module) => module.ResearchAssistantChatRuntime,
+    ),
+  { ssr: false },
+);
 
 const NEAR_BOTTOM_THRESHOLD = 48;
 const GENERIC_ERROR_MESSAGE =
@@ -112,6 +120,8 @@ function getCompleteSentenceLength(text: string) {
 export function ResearchAssistantChat() {
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [runtimeRequested, setRuntimeRequested] = useState(false);
+  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
   const [runtimeSnapshot, setRuntimeSnapshot] =
     useState<ResearchAssistantRuntimeSnapshot>(INITIAL_RUNTIME_SNAPSHOT);
   const conversationRef = useRef<HTMLDivElement>(null);
@@ -147,6 +157,7 @@ export function ResearchAssistantChat() {
       }
 
       pendingSubmissionRef.current = null;
+      setIsPreparingSubmission(false);
       setInput((currentInput) =>
         currentInput === pendingSubmission.inputAtQueue ? "" : currentInput,
       );
@@ -282,10 +293,12 @@ export function ResearchAssistantChat() {
     const runtimeActions = runtimeActionsRef.current;
 
     if (!runtimeActions) {
+      setRuntimeRequested(true);
       pendingSubmissionRef.current = {
         text,
         inputAtQueue: input,
       };
+      setIsPreparingSubmission(true);
       return;
     }
 
@@ -294,6 +307,7 @@ export function ResearchAssistantChat() {
   }
 
   function handleExamplePrompt(prompt: string) {
+    setRuntimeRequested(true);
     setInput(prompt);
     composerRef.current?.focus();
   }
@@ -332,10 +346,12 @@ export function ResearchAssistantChat() {
       className="overflow-hidden rounded-panel border border-border bg-surface-elevated shadow-card"
       aria-label="Research Assistant conversation"
     >
-      <ResearchAssistantChatRuntime
-        onActionsChange={handleRuntimeActionsChange}
-        onSnapshotChange={handleRuntimeSnapshotChange}
-      />
+      {runtimeRequested ? (
+        <ResearchAssistantChatRuntime
+          onActionsChange={handleRuntimeActionsChange}
+          onSnapshotChange={handleRuntimeSnapshotChange}
+        />
+      ) : null}
       <div className="relative">
         <div
           className="max-h-[32rem] min-h-80 space-y-5 overflow-x-hidden overflow-y-auto p-4 sm:p-6"
@@ -522,9 +538,16 @@ export function ResearchAssistantChat() {
           placeholder="Ask about your travel research..."
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onFocus={() => setRuntimeRequested(true)}
           onKeyDown={handleComposerKeyDown}
           disabled={isBusy}
         />
+
+        {isPreparingSubmission ? (
+          <p className="sr-only" role="status" aria-live="polite">
+            Preparing Research Assistant&hellip;
+          </p>
+        ) : null}
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-small text-muted">
@@ -543,9 +566,13 @@ export function ResearchAssistantChat() {
             <button
               className="inline-flex min-h-11 w-full items-center justify-center rounded-control bg-brand px-5 py-3 text-label font-semibold text-brand-contrast transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:bg-muted sm:w-auto"
               type="submit"
-              disabled={input.trim().length === 0}
+              disabled={
+                isPreparingSubmission || input.trim().length === 0
+              }
             >
-              Send
+              {isPreparingSubmission
+                ? "Preparing Research Assistant…"
+                : "Send"}
             </button>
           )}
         </div>

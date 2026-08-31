@@ -45,6 +45,11 @@ test("completes the Research Assistant primary flow with a mocked AI response", 
 
   const messageInput = page.getByLabel("Message");
   await expect(messageInput).toBeVisible();
+  const initialMessageInput = await messageInput.elementHandle();
+  expect(initialMessageInput).not.toBeNull();
+  if (!initialMessageInput) {
+    throw new Error("Research Assistant textarea was not mounted.");
+  }
   await messageInput.fill(
     "What should I prioritize for this Barcelona trip?",
   );
@@ -56,5 +61,16 @@ test("completes the Research Assistant primary flow with a mocked AI response", 
   await expect(assistantMessage.getByText(assistantResponse)).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
   await expect(messageInput).toBeEnabled();
+  const finalMessageInput = await messageInput.elementHandle();
+  expect(finalMessageInput).not.toBeNull();
+  if (!finalMessageInput) {
+    throw new Error("Research Assistant textarea was replaced.");
+  }
+  expect(
+    await initialMessageInput.evaluate(
+      (initialElement, finalElement) => initialElement === finalElement,
+      finalMessageInput,
+    ),
+  ).toBe(true);
   expect(chatRequestCount).toBe(1);
 });
