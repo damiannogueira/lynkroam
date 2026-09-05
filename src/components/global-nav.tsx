@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const navigationItems = [
-  { href: "/", label: "Trips" },
+  { href: "/trips", label: "Trips" },
   { href: "/explore", label: "Explore" },
   { href: "/trips/new", label: "New Trip" },
   { href: "/health", label: "Health" },
