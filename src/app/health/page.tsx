@@ -107,7 +107,7 @@ export default async function HealthPage() {
 
       <Link
         className="mt-6 inline-flex min-h-11 items-center rounded-control px-3 py-2 text-label font-semibold text-brand transition-colors hover:bg-brand-soft"
-        href="/"
+        href="/trips"
       >
         Back to Trips
       </Link>

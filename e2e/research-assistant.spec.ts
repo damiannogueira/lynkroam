@@ -34,7 +34,7 @@ test("completes the Research Assistant primary flow with a mocked AI response", 
     });
   });
 
-  await page.goto("/");
+  await page.goto("/trips");
   await page
     .getByRole("link", { name: "Open Barcelona research trip" })
     .click();
