@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
+import { SignatureShaderHero } from "@/components/signature-shader-hero";
 
 export default function Home() {
   return (
     <div className="mx-auto w-full max-w-page px-page-gutter py-section">
-      <section className="relative overflow-hidden rounded-panel border border-border bg-surface-elevated px-6 py-12 shadow-card sm:px-10 sm:py-16 lg:px-14 lg:py-20">
-        <div className="relative max-w-reading space-y-8">
+      <section className="relative isolate flex min-h-[clamp(34rem,72vh,48rem)] items-center overflow-hidden rounded-panel border border-border bg-surface-elevated px-5 py-10 shadow-card sm:px-10 sm:py-14 lg:px-14 lg:py-16">
+        <SignatureShaderHero />
+
+        <div className="relative z-10 max-w-reading space-y-8 rounded-panel border border-surface/70 bg-surface/90 p-6 shadow-card backdrop-blur-sm sm:p-8 lg:p-10">
           <PageHeader
             eyebrow="Travel research, organized"
             title="Turn scattered travel research into confident trip decisions."
