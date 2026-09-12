@@ -15,12 +15,76 @@ import { researchAssistantTools } from "@/lib/ai/tools";
 import type { ResearchAssistantUIMessage } from "@/lib/ai/types";
 
 const INVALID_REQUEST_MESSAGE = "Invalid chat request.";
+const OVERSIZED_REQUEST_MESSAGE = "Chat request is too large.";
 const STREAM_ERROR_MESSAGE =
   "The Research Assistant could not complete this response.";
+const MAX_REQUEST_BODY_BYTES = 65_536;
+const MAX_CHAT_MESSAGES = 50;
+const MAX_TEXT_PART_CHARACTERS = 4_000;
+const MAX_CONVERSATION_TEXT_CHARACTERS = 24_000;
+
+export const maxDuration = 60;
 
 type ChatRequestBody = {
   messages: unknown[];
 };
+
+type BoundedJsonResult =
+  | { status: "valid"; value: unknown }
+  | { status: "invalid" }
+  | { status: "too-large" };
+
+async function readBoundedJson(request: Request): Promise<BoundedJsonResult> {
+  const declaredLength = Number(request.headers.get("content-length"));
+
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_REQUEST_BODY_BYTES
+  ) {
+    return { status: "too-large" };
+  }
+
+  if (!request.body) {
+    return { status: "invalid" };
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteCount = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      byteCount += value.byteLength;
+
+      if (byteCount > MAX_REQUEST_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        return { status: "too-large" };
+      }
+
+      chunks.push(value);
+    }
+
+    const bytes = new Uint8Array(byteCount);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+
+    return { status: "valid", value: JSON.parse(text) as unknown };
+  } catch {
+    return { status: "invalid" };
+  }
+}
 
 function isChatRequestBody(value: unknown): value is ChatRequestBody {
   return (
@@ -89,18 +153,57 @@ function normalizeConversation(
   return normalizedMessages.length > 0 ? normalizedMessages : null;
 }
 
+function exceedsChatInputLimits(messages: ResearchAssistantUIMessage[]) {
+  if (messages.length > MAX_CHAT_MESSAGES) {
+    return true;
+  }
+
+  let conversationTextCharacters = 0;
+
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type !== "text") {
+        continue;
+      }
+
+      if (part.text.length > MAX_TEXT_PART_CHARACTERS) {
+        return true;
+      }
+
+      conversationTextCharacters += part.text.length;
+
+      if (conversationTextCharacters > MAX_CONVERSATION_TEXT_CHARACTERS) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function invalidRequestResponse() {
   return Response.json({ error: INVALID_REQUEST_MESSAGE }, { status: 400 });
 }
 
-export async function POST(request: Request) {
-  let body: unknown;
+function oversizedRequestResponse() {
+  return Response.json(
+    { error: OVERSIZED_REQUEST_MESSAGE },
+    { status: 413 },
+  );
+}
 
-  try {
-    body = await request.json();
-  } catch {
+export async function POST(request: Request) {
+  const bodyResult = await readBoundedJson(request);
+
+  if (bodyResult.status === "too-large") {
+    return oversizedRequestResponse();
+  }
+
+  if (bodyResult.status === "invalid") {
     return invalidRequestResponse();
   }
+
+  const body = bodyResult.value;
 
   if (!isChatRequestBody(body)) {
     return invalidRequestResponse();
@@ -114,6 +217,10 @@ export async function POST(request: Request) {
 
   if (!validation.success) {
     return invalidRequestResponse();
+  }
+
+  if (exceedsChatInputLimits(validation.data)) {
+    return oversizedRequestResponse();
   }
 
   const normalizedMessages = normalizeConversation(validation.data);
