@@ -5,8 +5,6 @@ Lynkroam is a visual travel research workspace that turns scattered sources, com
 - **Production:** [https://lynkroam.vercel.app](https://lynkroam.vercel.app)
 - **Repository:** [https://github.com/damiannogueira/lynkroam](https://github.com/damiannogueira/lynkroam)
 
-The final FE-11 production verification will happen after the completed work is integrated into `main`; this README does not imply that every change on the current feature branch is already deployed to Production.
-
 ## Screenshots
 
 ### Signature landing hero
@@ -110,7 +108,7 @@ Browser
 
 The Research Assistant shell stays immediately usable while its `useChat` runtime is dynamically loaded on genuine user interaction. `/api/chat` validates typed UI messages, converts them server-side, forwards request cancellation, and streams the response back to the persistent shell.
 
-The landing page uses a small raw-WebGL client leaf for its custom route-field fragment shader, avoiding a Three.js dependency on `/`. The heavier Three.js and React Three Fiber scene is isolated to `/explore` and loaded only after the user chooses **Launch 3D view**. Both experiences retain useful CSS/static fallbacks and respect reduced motion.
+The landing page uses a small raw-WebGL client leaf for its custom route-field fragment shader, avoiding a Three.js dependency on `/`. The heavier Three.js and React Three Fiber scene is isolated to `/explore` and loaded only after the user explicitly chooses to view the selected destination in 3D. Both experiences retain useful CSS/static fallbacks and respect reduced motion.
 
 Vercel builds Production from the GitHub-connected production branch and creates Preview Deployments for feature branches.
 
@@ -165,13 +163,14 @@ npm run build
 ```
 
 - Vitest and React Testing Library cover component, controller, shader lifecycle, and Route Handler behavior.
-- Playwright covers critical landing, Research Assistant, and Trip Explorer flows in Chromium.
+- Playwright critical flows passed in Chromium and desktop WebKit, with an additional iPhone/WebKit compatibility pass. These WebKit runs provide automated engine coverage and are not substitutes for real Safari testing.
+- Manual production-readiness review passed in Chrome, Firefox, Safari desktop, and Mobile Safari on iPhone.
 - The Research Assistant E2E intercepts `/api/chat` with a deterministic stream, so it does not call Gemini or consume provider credits.
 - `npm run build` performs the production compile and TypeScript validation.
 
 ## Deployment
 
-The Vercel project is connected to GitHub. `main` is intended as the Production Branch, while feature and assignment branches receive Preview Deployments for review. Final FE-11 Production verification will occur after the completed work is integrated into `main`.
+The Vercel project is connected to GitHub. `main` is the Production Branch, while feature branches receive Preview Deployments for review.
 
 Production URL: [https://lynkroam.vercel.app](https://lynkroam.vercel.app)
 
