@@ -1,210 +1,188 @@
 # Lynkroam
 
-Lynkroam is a visual travel research workspace that helps travelers turn scattered travel links into organized trip decisions.
+Lynkroam is a visual travel research workspace that turns scattered sources, comparisons, and planning context into organized trip decisions. It keeps the research behind each choice visible instead of acting as a generic bookmark manager or automatically generating an itinerary.
 
-The product focuses on the research-to-decision stage of travel planning. It is designed to preserve source context and help travelers compare and organize options, rather than act as a generic bookmark manager or automatically generate an itinerary.
+- **Production:** [https://lynkroam.vercel.app](https://lynkroam.vercel.app)
+- **Repository:** [https://github.com/damiannogueira/lynkroam](https://github.com/damiannogueira/lynkroam)
 
-## Current application scope
+The final FE-11 production verification will happen after the completed work is integrated into `main`; this README does not imply that every change on the current feature branch is already deployed to Production.
 
-This repository contains Lynkroam's deployed application foundation with:
+## Screenshots
 
-- Routed trip-planning screens and placeholder product surfaces
-- A shared root layout and global and trip-level navigation
-- A responsive design system
-- Server Components by default
-- Fictional Barcelona sample data
-- A server-rendered health check
-- A trip-scoped Research Assistant with streamed AI chat
-- Google Gemini integration through AI SDK
-- A typed `fetchUrlMetadata` server-side tool
-- Structured progress, success, and error states for metadata inspection
-- Vercel production and Preview Deployments
+### Signature landing hero
 
-Displayed trip content remains fictional and non-persistent. The current forms and planning surfaces demonstrate structure and visual direction only; chat conversation state is not persisted.
+![Lynkroam landing page with its signature route-field shader hero](docs/readme/lynkroam-home.png)
 
-## Implemented routes
+### Research Assistant
+
+![Lynkroam Research Assistant ready for a travel research question](docs/readme/research-assistant.png)
+
+## Product scope
+
+The current application includes:
+
+- A real landing page with a custom raw-WebGL signature hero
+- A Trips dashboard and fictional Barcelona research workspace
+- Source/link, itinerary, and trip-scoped Research Assistant views
+- Streamed Google Gemini responses through Vercel AI SDK
+- A typed server-side `fetchUrlMetadata` tool with designed lifecycle states
+- Accessible waiting, streaming, retry, error, and scrolling behavior
+- A health endpoint and visual health page
+- A progressively enhanced procedural 3D Trip Explorer at `/explore`
+- A focused motion and state micro-interaction demo at `/motion`
+- Automated Vitest, React Testing Library, and Playwright coverage
+- Accessibility and performance work documented in [AUDIT.md](AUDIT.md)
+
+Displayed trip information is fictional sample content. Authentication, persistence, real trip creation, and persisted chat history are not implemented.
+
+## Routes
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Trips dashboard |
+| `/` | Product landing page and signature shader hero |
+| `/trips` | Trips dashboard with the sample Barcelona trip |
 | `/trips/new` | Visual Create Trip form |
-| `/trips/[tripId]` | Visual research workspace |
-| `/trips/[tripId]/links` | Structured links and sources |
+| `/trips/[tripId]` | Trip research workspace |
+| `/trips/[tripId]/links` | Organized links and source context |
 | `/trips/[tripId]/itinerary` | Curated itinerary view |
-| `/trips/[tripId]/assistant` | Streaming travel research assistant and source metadata inspection |
-| `/api/chat` | Streaming AI chat and typed tool endpoint |
+| `/trips/[tripId]/assistant` | Streaming travel Research Assistant |
+| `/explore` | Procedural 3D Trip Explorer |
+| `/motion` | Motion and state micro-interaction demo |
 | `/health` | Visual application health status |
 | `/api/health` | JSON health endpoint |
+| `/api/chat` | Validated streaming AI and typed-tool endpoint |
 
-The fictional Barcelona workspace can be reviewed manually at:
+## Quick start
 
-- `/trips/barcelona`
-- `/trips/barcelona/links`
-- `/trips/barcelona/itinerary`
-- `/trips/barcelona/assistant`
+### Prerequisites
 
-## Technology
-
-- Next.js 16.2.12 with the App Router and Turbopack
-- React 19.2.4
-- TypeScript
-- Tailwind CSS 4
-- ESLint 9
-- AI SDK 7 with the Google provider and Gemini
-- Zod 4
+- Node.js 22 recommended (matches CI)
 - npm
-- Vercel
-
-## Server Component policy
-
-Pages and components remain Server Components by default. Client Components are introduced only when genuine browser-side interactivity requires them. The Research Assistant chat is a Client Component because it owns `useChat`, input state, streaming interaction, stopping, and conversation scrolling.
-
-The root layout owns the shared `<main>` landmark, so individual pages render their content without adding another main landmark.
-
-## Local development
-
-Install the locked dependencies and start the development server:
+- Git
 
 ```bash
+git clone https://github.com/damiannogueira/lynkroam.git
+cd lynkroam
 npm ci
+```
+
+For the real Research Assistant flow, create a local `.env.local` and set the server-side `GOOGLE_GENERATIVE_AI_API_KEY`. Leave it unset if you only need to review the non-AI product surfaces. `HEALTHCHECK_ORIGIN` is optional. Never commit secret values.
+
+```dotenv
+GOOGLE_GENERATIVE_AI_API_KEY=
+HEALTHCHECK_ORIGIN=
+```
+
+Start the application:
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
-Other project commands:
-
-```bash
-npm run lint
-npm run build
-npm run start
-```
-
-`npm run start` serves the production build created by `npm run build`.
+Open [http://localhost:3000](http://localhost:3000). The fictional workspace is available at `/trips/barcelona`.
 
 ## Environment variables
 
-Real `.env*` files remain ignored. The committed `.env.example` documents the optional environment structure without containing secrets.
+| Variable | Required? | Environment / scope | Purpose |
+| --- | --- | --- | --- |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | For real AI requests | User-supplied server secret; local `.env.local` and required Vercel environments | Authenticates the server-side Google Gemini provider. It is never exposed through a `NEXT_PUBLIC_` variable. |
+| `HEALTHCHECK_ORIGIN` | Optional | Application server | Overrides the origin used by the internal health request when Lynkroam is served outside Vercel. |
+| `VERCEL_URL` | System-provided on Vercel | Vercel runtime | Supplies the deployment hostname used by the health utility when no explicit origin is configured. |
+| `VERCEL_ENV` | System-provided on Vercel | Vercel runtime | Identifies the current Vercel environment in the health response. |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Conditional | Vercel server-side system secret | Lets the internal health request pass Deployment Protection on protected Previews. |
+| `PORT` | Optional/runtime-provided | Local or hosting runtime | Selects the local fallback port for health checks; defaults to `3000`. |
 
-- `HEALTHCHECK_ORIGIN` optionally overrides the application origin outside Vercel.
-- `GOOGLE_GENERATIVE_AI_API_KEY` provides the server-side credential used by the Research Assistant's Gemini integration.
-- Without an override or Vercel URL, the health utility falls back to `http://localhost:${PORT ?? 3000}`.
-- Vercel supplies `VERCEL_URL` and `VERCEL_ENV`.
-- No secret values belong in the repository.
+The tracked `.env.example` contains names and empty values only. Real `.env*` files remain ignored.
 
-Protected Vercel Preview Deployments use the server-only system variable `VERCEL_AUTOMATION_BYPASS_SECRET`. Its sole purpose here is to authorize the internal health request through deployment protection.
+## Architecture
 
-## Research Assistant tool contract
+Lynkroam uses Next.js 16 App Router and React 19. Pages and shared layout components remain Server Components by default. Focused Client Components own only browser interaction such as chat state, motion, WebGL, and the 3D destination controls.
 
-The Research Assistant includes actionable click-to-fill prompts for first-run guidance and a response-shaped pending state before visible content arrives. If a chat response is interrupted, partial streamed content remains visible and `Retry response` retries the failed assistant response without resending the user's message. A route-scoped recovery boundary handles unexpected display failures, while metadata results distinguish normal success, successful results with no descriptive content, and tool execution failures.
-
-### `fetchUrlMetadata`
-
-`fetchUrlMetadata` inspects page-level metadata from a user-supplied public HTTP or HTTPS webpage. It is an on-demand metadata tool, not unrestricted web browsing or verification of every fact on a page.
-
-Input:
-
-```ts
-{
-  url: string;
-}
+```text
+Browser
+  -> Next.js Server Component UI
+  -> isolated interactive Client Component
+  -> POST /api/chat
+  -> Vercel AI SDK / Google Gemini
+  -> typed fetchUrlMetadata tool when requested
+  -> streamed UI message response
 ```
 
-`url` must be a complete public HTTP or HTTPS webpage URL.
+The Research Assistant shell stays immediately usable while its `useChat` runtime is dynamically loaded on genuine user interaction. `/api/chat` validates typed UI messages, converts them server-side, forwards request cancellation, and streams the response back to the persistent shell.
 
-Structured return value:
+The landing page uses a small raw-WebGL client leaf for its custom route-field fragment shader, avoiding a Three.js dependency on `/`. The heavier Three.js and React Three Fiber scene is isolated to `/explore` and loaded only after the user chooses **Launch 3D view**. Both experiences retain useful CSS/static fallbacks and respect reduced motion.
 
-```ts
-{
-  url: string;
-  hostname: string;
-  title: string | null;
-  description: string | null;
-  siteName: string | null;
-}
+Vercel builds Production from the GitHub-connected production branch and creates Preview Deployments for feature branches.
+
+## Production safeguards
+
+The public AI route applies deterministic per-request limits before model conversion:
+
+- Request body: 64 KiB of actual encoded bytes
+- Validated messages: 50 maximum
+- Individual text part: 4,000 characters maximum
+- Total conversation text: 24,000 characters maximum
+- Model output: 1,600 tokens maximum
+- Model/tool steps: 2 maximum
+- Streaming function duration: 60 seconds
+- Client Stop action propagated through the request abort signal
+
+`fetchUrlMetadata` accepts public HTTP/HTTPS pages, follows at most three redirects, times out after eight seconds, and reads at most 1,000,000 HTML bytes. It rejects unsupported protocols, credential-bearing URLs, obvious local/private-network targets, non-HTML responses, and oversized pages.
+
+These input caps constrain abusive or unexpectedly large individual requests. They are **not** a global per-user or per-IP rate limiter.
+
+## Important engineering decisions
+
+- **Server Components by default:** limits browser JavaScript and keeps provider/tool configuration server-only.
+- **Deferred chat runtime:** preserves an immediately usable composer while keeping AI SDK runtime code off the initial Assistant route payload until interaction.
+- **Deferred Three/R3F:** `/explore` remains useful as a static destination experience before an explicit 3D launch.
+- **Raw WebGL landing hero:** gives Lynkroam a custom shader identity without adding Three/R3F to the landing bundle.
+- **Progressive enhancement:** shader, WebGL, reduced-motion, Save-Data, and unavailable-context fallbacks preserve content and controls.
+- **Deterministic AI limits:** bounded input, output, duration, and tool steps reduce uncontrolled request cost.
+- **Typed tool output:** metadata lifecycle parts render as designed UI rather than raw JSON.
+
+## How AI tools were used
+
+Codex integrated in VS Code was used through small, tightly scoped prompts to implement features, perform refactors, add tests, inspect repository state, and carry out controlled Git tasks. Suggestions were reviewed against the actual source and diffs rather than accepted as opaque generated output.
+
+Each change was validated proportionally with ESLint, Vitest, React Testing Library, Playwright, production builds, `git diff --check`, Vercel Preview Deployments, and manual browser review. AI-assisted investigation also helped reason about accessibility semantics, streaming resilience, bundle performance, deferred loading, WebGL/shader lifecycle behavior, and documentation. The developer made the product and architecture decisions and accepted, adjusted, or rejected generated changes after verification; the project was AI-assisted, not blindly or entirely AI-generated.
+
+## Testing
+
+Install Chromium once in a fresh clone before running the browser suite:
+
+```bash
+npx playwright install chromium
 ```
 
-The final URL and hostname are always returned on success. Optional page metadata is `null` when unavailable rather than inferred.
-
-The tool can fail for invalid or unsupported URLs, blocked local or private-network destinations, HTTP errors, non-HTML responses, timeouts, oversized responses, or excessive redirects. A failed execution appears as a designed error state inside the conversation instead of crashing the chat.
-
-Its typed UI part renders four lifecycle states: `input-streaming`, `input-available`, `output-available`, and `output-error`. Successful structured output is presented as a source metadata card rather than raw JSON.
-
-## Health check
-
-`/api/health` returns only the application name, status, environment, and a fresh timestamp. `/health` performs an actual server-side fetch to that endpoint and presents the result visually.
-
-Both the API response and server fetch disable caching. The endpoint exposes no sensitive data. For protected Preview Deployments, the protection-bypass header is added only when the Vercel system variable exists; local requests work without it. The health check has been verified both locally and in a protected Preview Deployment.
-
-## Deployment workflow
-
-`main` is the Vercel Production Branch. Feature and assignment branches can be reviewed through Vercel Preview Deployments before merging.
-
-Production is available at [https://lynkroam.vercel.app](https://lynkroam.vercel.app).
-
-Changes should pass local verification and be reviewed in a Preview Deployment before they are merged into `main`.
-
-## Accessibility and responsive targets
-
-The application foundation includes:
-
-- Semantic landmarks and a clear heading hierarchy
-- Keyboard-accessible navigation
-- A skip link
-- Visible focus states
-- Explicit form labels
-- States communicated with text rather than color alone
-
-The intended responsive review widths are 375px and 1280px.
-
-## Motion and state micro-interactions
-
-The live `/motion` demo uses approximately 150ms ease-out hover/focus feedback, a 100ms ease-out active press, and 200ms ease-out lifecycle-content and state color/shadow transitions. Its deterministic action delay is 900ms; success remains visible for 1200ms, while error remains for 1500ms because recovery feedback benefits from slightly more reading time. Fast direct-input feedback feels immediate, while the slightly slower lifecycle changes remain perceptible without feeling sluggish; transform and opacity provide the primary motion without animating width, height, or other layout properties, and `prefers-reduced-motion` removes movement while preserving loading, success, error, and focus feedback.
-
-## FE-AA2 — 3D Trip Explorer
-
-The [`/explore`](https://lynkroam-git-fe-aa2-first-3d-e-54aa93-damian-nogueira-developer.vercel.app/explore) experience uses React Three Fiber and Three.js to present procedural Barcelona, Lisbon, and Tokyo compositions. Destination selection changes both the research context and visual composition, while the useful static preview remains available before the user explicitly chooses `Launch 3D view`. Reduced-motion, Save-Data, and unavailable-WebGL conditions retain the static experience, and the controls remain usable on mobile and touch devices.
-
-**Performance.** The scene uses procedural geometry with zero external model or texture bytes. Its dynamically isolated Three/R3F payload is approximately 234 KB gzip and loads only after explicit user launch; `frameloop="demand"` and a DPR capped at 1–1.5 limit rendering cost, while reduced-motion and Save-Data avoid loading the scene. A clean Lighthouse Mobile audit of the deployed Preview recorded 91 Performance, 96 Accessibility, 1.6 s LCP, 360 ms TBT, and 0 CLS. The initial payload was approximately 231 KiB, with Three/R3F absent from the initial page-load path.
-
-**With more time.** I would add richer destination-specific procedural detail, optional camera transitions or touch gestures that continue to respect reduced motion, and a reusable scene-load failure boundary with retry, alongside real-user performance telemetry on physical mobile devices.
-
-## Explicit current non-goals
-
-The current application does not implement:
-
-- Authentication
-- Persistence or database workflows
-- Real trip creation
-- Persistent URL-ingestion or automatic source-library workflows
-- Full-page extraction or verification of changing webpage facts
-- Drag-and-drop
-- Filtering and sorting
-- Maps
-- AI itinerary generation
-- Collaboration
-- Billing
-- Admin tools
-
-## Future direction
-
-The following ideas are not currently implemented. Lynkroam may later support:
-
-- Persisting inspected travel sources into an automatic ingestion workflow
-- Organizing large trips hierarchically by continent, country, and city
-- Automatic location classification with manual correction
-- Views by location, category, decision state, and itinerary chronology
-- Multilingual interface support
-- Preserving original source languages
-- Optional translations and summaries in the user's selected language
-
-## Verification
-
-Run:
+Run the project checks:
 
 ```bash
 npm run lint
+npm run test:run
+npm run test:e2e
 npm run build
 ```
 
-The production build must expose the application's implemented routes, including the Research Assistant and health endpoints. Repository review must also confirm that no secrets or generated artifacts are tracked.
+- Vitest and React Testing Library cover component, controller, shader lifecycle, and Route Handler behavior.
+- Playwright covers critical landing, Research Assistant, and Trip Explorer flows in Chromium.
+- The Research Assistant E2E intercepts `/api/chat` with a deterministic stream, so it does not call Gemini or consume provider credits.
+- `npm run build` performs the production compile and TypeScript validation.
+
+## Deployment
+
+The Vercel project is connected to GitHub. `main` is intended as the Production Branch, while feature and assignment branches receive Preview Deployments for review. Final FE-11 Production verification will occur after the completed work is integrated into `main`.
+
+Production URL: [https://lynkroam.vercel.app](https://lynkroam.vercel.app)
+
+Vercel retains previous deployments that can be selected as rollback candidates. This repository does not claim that a rollback has been performed.
+
+## Non-goals
+
+The current product does not include:
+
+- Authentication or user accounts
+- Persistence or database workflows
+- Real trip creation
+- Collaboration
+- Billing
