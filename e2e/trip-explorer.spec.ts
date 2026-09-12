@@ -12,9 +12,18 @@ test("explores destinations through the 3D Trip Explorer", async ({ page }) => {
     page.getByRole("heading", { level: 1, name: "3D Trip Explorer" }),
   ).toBeVisible();
 
-  const barcelonaButton = page.getByRole("button", { name: /Barcelona/ });
-  const lisbonButton = page.getByRole("button", { name: /Lisbon/ });
-  const tokyoButton = page.getByRole("button", { name: /Tokyo/ });
+  const destinationControls = page.getByRole("group", {
+    name: "Trip Explorer destinations",
+  });
+  const barcelonaButton = destinationControls.getByRole("button", {
+    name: /Barcelona/,
+  });
+  const lisbonButton = destinationControls.getByRole("button", {
+    name: /Lisbon/,
+  });
+  const tokyoButton = destinationControls.getByRole("button", {
+    name: /Tokyo/,
+  });
 
   await expect(barcelonaButton).toHaveAttribute("aria-pressed", "true");
   await expect(
@@ -27,9 +36,14 @@ test("explores destinations through the 3D Trip Explorer", async ({ page }) => {
   ).toBeVisible();
 
   const launchButton = page.getByRole("button", {
-    name: "Launch 3D view",
+    name: "View Barcelona in 3D",
   });
   await expect(launchButton).toBeVisible();
+  await expect(
+    page.getByText(
+      "The 3D forms are conceptual, destination-inspired compositions rather than literal maps or landmark models.",
+    ),
+  ).toBeVisible();
 
   await lisbonButton.click();
   await expect(lisbonButton).toHaveAttribute("aria-pressed", "true");
@@ -40,9 +54,12 @@ test("explores destinations through the 3D Trip Explorer", async ({ page }) => {
     ),
   ).toBeVisible();
   await expect(page.getByRole("figure", { name: "Lisbon" })).toBeVisible();
-  await expect(launchButton).toBeVisible();
+  const lisbonLaunchButton = page.getByRole("button", {
+    name: "View Lisbon in 3D",
+  });
+  await expect(lisbonLaunchButton).toBeVisible();
 
-  await launchButton.click();
+  await lisbonLaunchButton.click();
 
   const interactiveLisbon = page.getByRole("img", {
     name: "Interactive 3D destination scene for Lisbon",
@@ -50,7 +67,9 @@ test("explores destinations through the 3D Trip Explorer", async ({ page }) => {
   const unavailableLabel = page.getByText("Static preview — 3D unavailable");
 
   await expect(interactiveLisbon.or(unavailableLabel)).toBeVisible();
-  await expect(launchButton).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^View .+ in 3D$/ }),
+  ).toHaveCount(0);
 
   const interactiveSceneAvailable = await interactiveLisbon.isVisible();
 

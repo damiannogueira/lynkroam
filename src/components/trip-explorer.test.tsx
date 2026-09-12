@@ -111,7 +111,12 @@ describe("TripExplorer", () => {
     render(<TripExplorer />);
 
     expect(
-      await screen.findByRole("button", { name: "Launch 3D view" }),
+      await screen.findByRole("button", { name: "View Barcelona in 3D" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The 3D forms are conceptual, destination-inspired compositions rather than literal maps or landmark models.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Barcelona/, pressed: true }),
@@ -146,7 +151,7 @@ describe("TripExplorer", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(webGLContextRequests).toBe(0);
 
-    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
+    await user.click(screen.getByRole("button", { name: "View Lisbon in 3D" }));
 
     expect(
       await screen.findByRole("img", {
@@ -190,7 +195,7 @@ describe("TripExplorer", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(webGLContextRequests).toBe(0);
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
@@ -206,7 +211,7 @@ describe("TripExplorer", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByText(
@@ -230,7 +235,7 @@ describe("TripExplorer", () => {
       await screen.findByText("Static preview — data saver"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(webGLContextRequests).toBe(0);
@@ -256,19 +261,19 @@ describe("TripExplorer", () => {
     render(<TripExplorer />);
 
     expect(
-      await screen.findByRole("button", { name: "Launch 3D view" }),
+      await screen.findByRole("button", { name: "View Barcelona in 3D" }),
     ).toBeInTheDocument();
     expect(webGLContextRequests).toBe(0);
 
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
-    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
+    await user.click(screen.getByRole("button", { name: "View Lisbon in 3D" }));
 
     expect(
       await screen.findByText("Static preview — 3D unavailable"),
     ).toBeInTheDocument();
     expect(webGLContextRequests).toBeGreaterThan(0);
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(
@@ -289,10 +294,10 @@ describe("TripExplorer", () => {
     render(<TripExplorer />);
 
     expect(
-      await screen.findByRole("button", { name: "Launch 3D view" }),
+      await screen.findByRole("button", { name: "View Barcelona in 3D" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Lisbon" }));
-    await user.click(screen.getByRole("button", { name: "Launch 3D view" }));
+    await user.click(screen.getByRole("button", { name: "View Lisbon in 3D" }));
     expect(
       await screen.findByRole("img", {
         name: "Interactive scene for lisbon",
@@ -308,7 +313,7 @@ describe("TripExplorer", () => {
       screen.getByText("Static preview — reduced motion"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Lisbon/, pressed: true }),
@@ -328,7 +333,7 @@ describe("TripExplorer", () => {
       screen.getByRole("button", { name: /Lisbon/, pressed: true }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Launch 3D view" }),
+      screen.queryByRole("button", { name: /^View .+ in 3D$/ }),
     ).not.toBeInTheDocument();
   });
 });

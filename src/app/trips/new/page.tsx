@@ -26,7 +26,7 @@ export default function CreateTripPage() {
               Trip details
             </h2>
             <p className="text-body text-muted">
-              This FE-04 form is a visual placeholder. It does not save or
+              This sample form is a visual placeholder. It does not save or
               create a trip yet.
             </p>
           </div>

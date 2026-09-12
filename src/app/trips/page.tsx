@@ -69,8 +69,9 @@ export default function TripsPage() {
           </h2>
           <p className="text-body text-muted">
             When trip creation is connected to persistence, this dashboard will
-            collect each planning workspace and show its research progress. For
-            FE-04, the sample above previews that future structure.
+            collect each planning workspace and show its research progress. The
+            fictional sample above previews how saved trips could appear here
+            once persistence is implemented.
           </p>
         </div>
       </section>

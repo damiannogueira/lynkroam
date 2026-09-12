@@ -235,6 +235,10 @@ export function TripExplorer() {
           Explore how each city changes the visual direction and the travel
           questions worth resolving before an itinerary takes shape.
         </p>
+        <p className="text-small text-muted">
+          The 3D forms are conceptual, destination-inspired compositions rather
+          than literal maps or landmark models.
+        </p>
       </div>
 
       <fieldset className="flex flex-wrap gap-3">
@@ -285,7 +289,7 @@ export function TripExplorer() {
                   type="button"
                   onClick={handleLaunchThreeD}
                 >
-                  Launch 3D view
+                  View {selectedDestination.name} in 3D
                 </button>
               ) : null
             }
