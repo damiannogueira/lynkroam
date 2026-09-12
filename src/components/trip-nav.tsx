@@ -11,6 +11,7 @@ export function TripNav({ tripId }: TripNavProps) {
     { href: basePath, label: "Workspace" },
     { href: `${basePath}/links`, label: "Links" },
     { href: `${basePath}/itinerary`, label: "Itinerary" },
+    { href: `${basePath}/assistant`, label: "Research Assistant" },
   ];
 
   return (

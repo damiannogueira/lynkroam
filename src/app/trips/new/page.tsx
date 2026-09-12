@@ -26,7 +26,7 @@ export default function CreateTripPage() {
               Trip details
             </h2>
             <p className="text-body text-muted">
-              This FE-04 form is a visual placeholder. It does not save or
+              This sample form is a visual placeholder. It does not save or
               create a trip yet.
             </p>
           </div>
@@ -113,7 +113,7 @@ export default function CreateTripPage() {
 
         <Link
           className="mt-6 inline-flex min-h-11 items-center rounded-control px-2 py-2 text-label font-semibold text-brand transition-colors hover:bg-brand-soft"
-          href="/"
+          href="/trips"
         >
           Back to Trips
         </Link>

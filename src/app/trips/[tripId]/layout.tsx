@@ -30,7 +30,7 @@ export default async function TripLayout({
       <PageHeader
         eyebrow="Fictional sample trip"
         title={formatTripTitle(tripId)}
-        description="This FE-04 workspace uses fictional, non-persistent Barcelona planning content to demonstrate Lynkroam’s trip structure."
+        description="This workspace uses fictional, non-persistent Barcelona planning content to demonstrate Lynkroam’s current trip structure."
       />
       <div className="mt-8">
         <TripNav tripId={tripId} />
