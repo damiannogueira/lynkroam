@@ -4,6 +4,7 @@ Lynkroam is a visual travel research workspace that turns scattered sources, com
 
 - **Production:** [https://lynkroam.vercel.app](https://lynkroam.vercel.app)
 - **Repository:** [https://github.com/damiannogueira/lynkroam](https://github.com/damiannogueira/lynkroam)
+- **Case study:** [Production AI product case study](CAPSTONE.md)
 
 ## Screenshots
 
